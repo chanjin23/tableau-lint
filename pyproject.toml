@@ -1,0 +1,50 @@
+[project]
+name = "twb-lint"
+version = "0.0.1"
+description = "Mandatory offline validation gate for Tableau .twb/.twbx files — syntactic (XSD) + semantic linting."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "mcp[cli]>=1.2",
+    "lxml>=5.0",
+    "lark>=1.1",
+]
+
+[project.optional-dependencies]
+# rule ④ (메타↔hyper 대조, 2차) — hyperapi는 MVP 크리티컬패스 아님
+hyper = ["tableauhyperapi>=0.0.19000"]
+# 구조 파싱 보조 (선택)
+docapi = ["tableaudocumentapi>=0.11"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
+
+[project.scripts]
+twb-lint = "twb_lint.cli:main"
+twb-lint-mcp = "twb_lint.mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/twb_lint"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = ["twb_lint"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["lark.*", "lxml.*", "mcp.*", "tableauhyperapi.*", "tableaudocumentapi.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
