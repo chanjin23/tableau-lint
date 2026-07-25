@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# venv (uv.lock은 재현성 위해 커밋한다 — ignore 안 함)
+.venv/
+
+# tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Claude Code 로컬 런타임 로그 (훅이 생성, 세션마다 증가 — 커밋 안 함)
+.claude/logs/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
