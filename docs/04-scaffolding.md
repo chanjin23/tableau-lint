@@ -50,6 +50,36 @@ uv run mypy                  # Success: no issues (25 files)
 # registry → calc.field_refs, calc.functions, named.refs, xsd.schema
 ```
 
+## 개발 환경 — 머신별 제약 (2026-07-28 추가)
+
+**Smart App Control이 켜진 Windows에서는 `uv`를 실행할 수 없다.**
+
+```
+VerifiedAndReputablePolicyState = 1   (켜짐 — 끄면 Windows 재설치 전까지 재활성화 불가)
+uv.exe = NotSigned
+→ Program 'uv.exe' failed to run: An Application Control policy has blocked this file
+```
+
+winget본·PyPI본 모두 동일하게 차단된다(배포 경로가 아니라 바이너리 서명 문제).
+
+**우회**: 새 실행파일을 띄우지 않고 서명된 `python.exe`만 쓴다.
+
+```bash
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pytest -q       # 4 passed
+.venv/Scripts/python -m ruff check .    # All checks passed
+.venv/Scripts/python -m mypy            # Success: no issues in 25 source files
+```
+
+`pytest.exe` 같은 콘솔 런처 대신 `python -m`으로 부르는 것이 요점이다.
+
+한계: `uv.lock`의 정확한 핀을 pip이 못 읽어 `pyproject.toml` 범위로 설치된다.
+dev 툴 용도라 실질 영향은 작지만, **재현성이 필요한 검증은 uv가 되는 머신에서 한다.**
+
+> PC를 옮기면 개발 환경이 조용히 깨진다. 훅(`jq` 부재)·uv(정책 차단) 둘 다 같은 원인이었다.
+> 환경 전제를 코드가 아니라 **문서에 남긴다.**
+
 ## 다음 (구현 단계)
 
 1. `io/twbx.py`·`io/twb.py`·`inspect.py` 실로직 (unpack/parse/모델추출).
