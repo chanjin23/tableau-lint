@@ -18,14 +18,37 @@ twb-lint = 공식 XSD(A) 위에 **(B) 시맨틱 검증기**를 얹은 것.
 
 ## 상태
 
-**스캐폴딩 단계** — 골격 + stub. 실제 검증 로직은 구현 단계에서 채운다.
+**스캐폴딩 + 스파이크 완료** — 골격 + stub. 실제 검증 로직은 구현 단계에서 채운다.
 
-MVP 검증 규칙 (고가치 3):
-1. `calc.functions` — calc 내 미지원/환각 함수 (함수 화이트리스트)
+대상 환경: **Tableau 2026.1 · 로컬 전용** (`docs/02-specification.md` S7).
+
+MVP 검증 규칙 (고가치 4):
+1. `calc.functions` — calc 내 미지원/환각 함수 (함수 화이트리스트) — **WARNING 기조**
 2. `calc.field_refs` — calc 필드 참조 dangling 해소
-3. `named.refs` — worksheet↔dashboard↔window 참조 무결성
+3. `named.refs` — worksheet↔dashboard↔window 참조 무결성 (viewpoint 누락 = 내부 오류 2805CF18)
+4. `manifest.gates` — 기능↔`document-format-change-manifest` 일관성. **XSD가 못 잡는 로드 거부 클래스**
 
 2차: `meta.hyper`(메타↔hyper 대조, `[hyper]` extra), `connection.attrs`.
+
+### L-A는 공짜가 아니다 (실측)
+
+공식 XSD를 그대로 쓰면 **정상 파일 9/9가 실패한다.** 전처리 3단계가 필요하다:
+
+| 단계 | 내용 | 시점 |
+|---|---|---|
+| 스텁 주입 | `user`·`xml` 네임스페이스 import에 `schemaLocation` 없음 → 컴파일 불가 | vendoring |
+| 과엄격 패치 | `explain-data`가 필수로 선언됨 (실제 Tableau는 미사용 시 생략) | vendoring |
+| fcp 정규화 | `_.fcp.<기능>.true...<이름>` 접두사를 트리 사본에서 제거 | 검증 직전 |
+
+전체 실측: [`docs/05-xsd-spike.md`](./docs/05-xsd-spike.md).
+XSD 선택 키는 `<workbook version>`이 **아니라** `source-build`다 (2026.1이 만든 파일도 `version='18.1'`).
+
+### 심각도 원칙
+
+> **파일이 열리지 않는다고 확신할 때만 ERROR. 우리 지식의 공백은 WARNING.**
+
+게이트가 mandatory이므로 거짓 ERROR 1건이 멀쩡한 파일을 막는다 → 사용자가 게이트를 끈다.
+`AC7 거짓양성 0`(정상 골든셋 ERROR 0건)을 AC2(검출율)와 동급 기준으로 둔다.
 
 ## 설치
 

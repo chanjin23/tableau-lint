@@ -7,9 +7,10 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | ✅ 확정 |
-| 버전 | v1.0 (2026-07-25) |
+| 버전 | v1.1 (2026-07-28) |
 | 소유자 | ax3didim@gmail.com |
 | 다음 | [스펙](./02-specification.md) → 설계 |
+| v1.1 변경 | §2 공식 REST 검증 추가 · §7 XSD 실측 결과 반영 · §8 로더 문법 게이팅 추가 · §9 해소 표기 |
 
 ---
 
@@ -28,6 +29,20 @@ Tableau에는 로컬 `.twb/.twbx` 파일을 **저작·편집**해주는 신뢰 �
 | 커뮤니티 MCP (Loki, hetpatel, wjsutton 등) | 주로 REST API | 쿼리·관리·CSV 추출 | 로컬 파일 저작 도구 없음 |
 
 **결론: 로컬 `.twb/.twbx`를 에러 없이 저작·편집하는 도구는 시장에 없다.** = 이 프로젝트가 노리는 빈틈.
+
+### 2.1 추가 확인 (2026-07-28) — 공식 검증 REST API 등장
+
+공식 XSD 레포 README에 명시:
+
+> Tableau Cloud June 2026 / Server 2026.2부터 REST API로 **구문·시맨틱 양쪽** 검증 가능
+> (`Validate Workbook`, `Validate Workbook and Upload`).
+> *"Semantic validation: Successful semantic validation means that a workbook will open in Tableau."*
+
+공식이 시맨틱 검증 능력을 갖췄다. 다만 **Cloud/Server 온라인 전용**이다.
+
+- 이 프로젝트 요구는 **로컬·오프라인**(§4 확정 요구) → 대체재가 아니다
+- 사용자 환경은 **로컬 전용, Cloud 접근 불가**(2026-07-28 확인) → 이용 불가
+- 골든셋 라벨링 오라클로 쓸 여지도 같은 이유로 없음 → **라벨링은 로컬 Tableau Desktop 2026.1 수동**
 
 ## 3. 근본 원인 (왜 AI가 Tableau 작업을 못하나)
 
@@ -97,6 +112,25 @@ Tableau 파일이 열리려면 **두 계층**을 모두 통과해야 하는데, 
 
 메타↔hyper 대조는 `tableauhyperapi`의 `Catalog.get_table_definition()`으로 오프라인 가능(확인됨).
 
+### 7.1 실측 검증 (2026-07-28) — 공식 XSD를 그대로는 쓸 수 없다
+
+위 §7은 **조사 결과**였다. 실사용 워크북 9개로 실제로 돌려본 결과
+(상세: [`05-xsd-spike.md`](./05-xsd-spike.md)):
+
+> **정상 파일 9개 전부가 공식 XSD를 통과하지 못한다.** 전처리 3단계를 넣어야 9/9 통과한다.
+
+| 결함 | 내용 | 대응 |
+|---|---|---|
+| XSD 컴파일 불가 | `user`·`xml` 네임스페이스를 `schemaLocation` 없이 import 하고 그 안의 컴포넌트를 참조 | 스텁 스키마 2개 주입 |
+| `_.fcp.` 미모델링 | Tableau 하위호환 접두사(`_.fcp.<기능>.true...<이름>`)를 XSD가 모름 → 파일당 48~55건 오류 | 검증 전 접두사 정규화 |
+| 과엄격 | `explain-data`가 필수인데 실제 Tableau는 미사용 시 안 씀 → 파일당 1건 | XSD 패치(`minOccurs="0"`) |
+
+**"(A) 구문 검증은 공식 XSD로 해결됨(재발명 불필요)"는 유효하되, 무료는 아니다.**
+vendoring이 원본 복사가 아니라 **패치 파이프라인**이 된다.
+
+부수 확인 — `<workbook version>`은 저작 버전이 아니다. Tableau 2026.1이 만든 파일도
+`version='18.1'`(= 최소 호환 버전)로 저장된다. 버전↔XSD 매핑은 `source-build`를 기준으로 해야 한다.
+
 ## 8. 시맨틱 커버리지 정밀조사 (E2E 완전제거 가능한가?)
 
 XSD 非커버 4항목 + render 계층을 "오프라인 정적검증으로 잡히는 정도"로 매핑. (Tableau **자체 linter 없음** — 커뮤니티 도구 BMB·python calc 추출기만 존재. 우리가 메울 빈틈.)
@@ -108,7 +142,23 @@ XSD 非커버 4항목 + render 계층을 "오프라인 정적검증으로 잡히
 | 메타↔hyper 불일치(embedded) | **높음** | `hyperapi Catalog`로 hyper 스키마 vs `.twb` 필드 대조 | 로컬 embedded extract 한정 |
 | connection 속성 | **중간** | 필수속성·타입 정적검사 O / live DB 실제연결 X | embedded=검증가능, live DB=오프라인 불가 |
 | `processContents="skip"` 요소 | **낮음** | 구조적으로 불투명(벤더확장/동적) | 드묾. best-effort/E2E |
+| **매니페스트 미선언 기능** (2026-07-28 추가) | **높음** | 기능↔`document-format-change-manifest` 항목 대응표 대조 | ↓ 7.2 — **XSD가 원리적으로 못 잡는 영역** |
 | **render 런타임** (blank viz, "rendering 실패", device/phone layout) | **불가** | 실제 쿼리실행·마크렌더 필요 | **E2E 전용 잔여영역** |
+
+### 8.1 실측 추가 (2026-07-28) — 로더 문법 ≠ XSD 문법
+
+과거 작업 기록(`old/generate-report` 함정 W2·I7)과 이번 표본 대조로 확인된 실패 클래스:
+
+> **유효 문법 = `version` 선언 × `<document-format-change-manifest>` 항목 집합.**
+> 기능을 쓰면서 대응 매니페스트 항목을 선언하지 않으면
+> `no declaration found for element '<요소>'`로 **로드 거부**된다.
+
+실측 쌍: `<manual-sort>` ↔ `SortTagCleanup`, `<edit-group-action>` ↔ `GroupAction`+`GroupActionAddRemove`.
+
+**중요**: 공식 XSD는 `manual-sort`를 무조건 허용한다. 즉 매니페스트 없이 쓴 파일은
+**(A) 구문 검증을 통과하고 Tableau에서 열리지 않는다.**
+"XSD 통과 = (A) 해결"이 아니라 **"XSD를 따르는 것이 오히려 로드 실패를 유발할 수 있다."**
+→ L-B 규칙으로 편입 ([`06-rule-candidates.md`](./06-rule-candidates.md) R1).
 
 ### 결론: E2E 완전제거는 불가, 그러나 격하 가능
 > **로드-실패(안 열림) 클래스는 대부분 오프라인으로 잡힌다** (calc·참조·메타↔hyper = 가장 흔한 원인). → 매 편집 E2E 불필요.
@@ -117,7 +167,13 @@ XSD 非커버 4항목 + render 계층을 "오프라인 정적검증으로 잡히
 
 ## 9. 열린 질문 (설계 단계에서 해소)
 
-- **함수 화이트리스트 확보처** — 버전별 공식 calc 함수목록 소스(help.tableau.com 파싱? 정적 목록 유지?). calc 파서 자체구현 vs 기존 라이브러리.
-- **live DB connection 처리 정책** — 오프라인 검증 불가 영역을 경고로만 낼지, 범위에서 제외할지.
-- **정확성 측정** — 골든셋(정상+고장 파일 쌍) 구성, round-trip 회귀.
-- 저작(맨바닥 생성) 범위 — 어디까지 자동, 어디부터 템플릿.
+- ~~**함수 화이트리스트 확보처**~~ → 설계 D0 해소: help.tableau.com 1회 스크랩 → 버전별 정적 JSON. 파서는 Lark 경량 문법.
+- **live DB connection 처리 정책** — 오프라인 검증 불가 영역을 경고로만 낼지, 범위에서 제외할지. → 경고로 확정(D6), 세부 미정.
+- ~~**정확성 측정**~~ → 부분 해소: 골든셋 조달 경로 확보. 정상본 9개 실파일 + 규칙 주입으로 고장본 생성([`06-rule-candidates.md`](./06-rule-candidates.md) §D). 라벨링은 로컬 Tableau Desktop 2026.1 수동.
+- 저작(맨바닥 생성) 범위 — 어디까지 자동, 어디부터 템플릿. (여전히 미결, 2차)
+
+### 9.1 신규 열린 질문 (2026-07-28)
+
+- **매니페스트 게이트 대응표를 어디까지 확보할 것인가** — 현재 실측 2쌍뿐. 전수 목록의 출처가 없다.
+  후보: `tablangres.rcc`(설치본 내장 XSD 32블록) 역수확 → 설계 D8.
+- **XSD 패치 관리** — 상류 갱신 시 패치 재적용·회귀를 어떻게 보장할 것인가.
