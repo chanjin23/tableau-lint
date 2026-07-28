@@ -12,6 +12,10 @@
 | 04 | [스캐폴딩 (Scaffolding)](./04-scaffolding.md) | ✅ 완료 |
 | 05 | [XSD 스파이크 실측 (Spike Report)](./05-xsd-spike.md) | ✅ 완료 |
 | 06 | [규칙 후보 인벤토리 (Rule Candidates)](./06-rule-candidates.md) | 🔄 living |
+| 07 | [구현 가이드 (Implementation Guide)](./07-implementation-guide.md) | 🔄 living |
+
+**구현 착수 전에는 07을 읽는다** — G1~G7 함정, 검증 파이프라인, 관례.
+루트 [`CLAUDE.md`](../CLAUDE.md)가 진입점이며 여기와 07을 가리킨다.
 
 ## 진행 순서
 
