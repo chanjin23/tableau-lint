@@ -9,7 +9,7 @@
 | 01 | [문제정의 (Problem Definition)](./01-problem-definition.md) | ✅ 확정 v1.1 |
 | 02 | [스펙 (Specification)](./02-specification.md) | ✅ 확정 v1.1 |
 | 03 | [설계 (Design)](./03-design.md) | ✅ 확정 v1.1 |
-| 04 | [스캐폴딩 (Scaffolding)](./04-scaffolding.md) | ✅ 완료 |
+| 04 | [스캐폴딩 (Scaffolding)](./04-scaffolding.md) | ✅ 완료 v1.1 |
 | 05 | [XSD 스파이크 실측 (Spike Report)](./05-xsd-spike.md) | ✅ 완료 |
 | 06 | [규칙 후보 인벤토리 (Rule Candidates)](./06-rule-candidates.md) | 🔄 living |
 | 07 | [구현 가이드 (Implementation Guide)](./07-implementation-guide.md) | 🔄 living |
@@ -33,6 +33,6 @@
 ## 메타
 
 - 소유자: ax3didim@gmail.com
-- 최종 갱신: 2026-07-28 (01·02·03 v1.1, 05·06 신규)
+- 최종 갱신: 2026-07-28 (01·02·03 v1.1, 05·06 신규, 04 v1.1 = 코드 drift 해소)
 - 변경 이력: 각 문서의 "문서 관리" 블록 참조.
 - 대상 환경 고정: **Tableau 2026.1 · 로컬 전용** (02 S7).

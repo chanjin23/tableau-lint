@@ -186,7 +186,10 @@ Success: no issues found in 25 source files
           return []
   ```
   레지스트리가 자동 수집한다. `engine.py`·`registry.py`를 건드릴 필요 없다
-- **findings 정렬**: `stage → rule_id → location` 고정 (결정론, 골든셋 diff 노이즈 방지)
+- **findings 정렬**: `stage → rule_id → location` 고정 (결정론, 골든셋 diff 노이즈 방지).
+  **`engine.validate_model`이 보장한다 — 규칙은 반환 순서를 신경 쓰지 않아도 된다**
+- **stub 테스트**: `@pytest.mark.stub`는 stub 상태의 사실을 고정한 테스트다.
+  구현하면 깨지는 게 정상이며, 그때 고칠 것은 **코드가 아니라 테스트**다
 - **임시 파일**: 스크래치패드에. 저장소에 실험 산출물을 남기지 않는다
 
 ## 4. 구현 순서 (현재 지점)
