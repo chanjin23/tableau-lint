@@ -12,6 +12,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
+from twb_lint import config
 from twb_lint import inspect as inspector
 from twb_lint.io import twbx
 from twb_lint.validation import engine
@@ -44,14 +45,31 @@ def twb_validate(path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def twb_inspect(path: str) -> dict[str, Any]:
-    """`.twb`/`.twbx`의 구조 모델(필드·시트 등)을 반환한다."""
+    """`.twb`/`.twbx`의 구조 모델(데이터소스·필드·시트·대시보드)을 반환한다."""
     with tempfile.TemporaryDirectory(prefix="twb_lint_") as tmp:
         model = inspector.inspect(Path(path), Path(tmp))
         return {
             "source": str(model.source),
+            "source_build": model.source_build,
+            "release": config.release_from_source_build(model.source_build),
             "twb_version": model.twb_version,
-            "field_names": sorted(model.field_names),
-            "sheet_names": sorted(model.sheet_names),
+            "manifest_features": sorted(model.manifest_features),
+            "datasources": {
+                name: {
+                    "caption": ds.caption,
+                    "fields": sorted(ds.fields),
+                    "calcs": sorted(n for n, f in ds.fields.items() if f.is_calc),
+                }
+                for name, ds in model.datasources.items()
+            },
+            "worksheets": sorted(model.worksheets),
+            "dashboards": {
+                name: {
+                    "sheet_zones": list(dash.sheet_zones),
+                    "viewpoints": sorted(dash.viewpoints),
+                }
+                for name, dash in model.dashboards.items()
+            },
         }
 
 
