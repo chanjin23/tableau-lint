@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "note": "기능 요소 ↔ <document-format-change-manifest> 항목 대응표 (L-B 규칙 ⑥). 유효 문법 = version 선언 × 매니페스트 항목 집합이라, 기능을 쓰면서 대응 항목을 선언하지 않으면 로드 거부된다. 공식 XSD는 이 요소들을 무조건 허용하므로 L-A가 원리적으로 못 잡는다.",
+  "policy": "표에 있는 기능만 ERROR로 판정한다. 표에 없는 요소를 추측해 ERROR를 내지 않는다 (docs/02-specification.md S1-6).",
+  "provenance": "docs/05-xsd-spike.md F5 · docs/06-rule-candidates.md R1",
+  "gates": [
+    {
+      "element": "manual-sort",
+      "requires": ["SortTagCleanup"],
+      "symptom": "no declaration found for element 'manual-sort'",
+      "source": "docs/05-xsd-spike.md F5 (함정 W2)"
+    },
+    {
+      "element": "edit-group-action",
+      "requires": ["GroupAction", "GroupActionAddRemove"],
+      "symptom": "no declaration found for element 'edit-group-action'",
+      "source": "docs/06-rule-candidates.md R1 (함정 I7)"
+    }
+  ]
+}

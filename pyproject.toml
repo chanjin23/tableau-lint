@@ -48,3 +48,6 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# stub 상태의 사실을 단언하는 테스트. 실로직이 들어오면 깨져야 하며,
+# 그때 고칠 것은 코드가 아니라 테스트다. 부채를 grep 가능하게 표시해 둔다.
+markers = ["stub: scaffolding stub의 동작을 고정한 테스트 (구현 시 교체 대상)"]

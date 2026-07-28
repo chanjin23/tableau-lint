@@ -73,6 +73,16 @@ def xsd_path(release: str | None) -> Path | None:
     return path if path.exists() else None
 
 
+def manifest_gates_path() -> Path | None:
+    """기능↔매니페스트 대응표 경로 (규칙 ⑥). 파일 부재면 None.
+
+    릴리스별로 갈리지 않는다 — 게이팅 관계 자체는 기능 도입 시점에 고정되기 때문이다.
+    근거: docs/05-xsd-spike.md F5.
+    """
+    path = Path(str(files("twb_lint").joinpath("data", "manifest_gates.json")))
+    return path if path.exists() else None
+
+
 def functions_path(release: str | None) -> Path | None:
     """릴리스에 맞는 함수 화이트리스트 경로. 미지원이거나 파일 부재면 None."""
     if release is None:
