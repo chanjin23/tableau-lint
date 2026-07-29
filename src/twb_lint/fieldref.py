@@ -39,12 +39,15 @@ _BRACKET = r"\[(?:[^\]]|\]\])*\]"
 _REF = re.compile(rf"(?P<ds>{_BRACKET})\.(?P<name>{_BRACKET})|(?P<solo>{_BRACKET})")
 """`[ds].[field]` 또는 `[field]`. 자격 있는 형태를 먼저 시도한다."""
 
-_DECORATED = re.compile(r"^(?P<role>[a-z]{1,8}):(?P<inner>.+):(?P<kind>[a-z]{2})$")
+_DECORATED = re.compile(r"^(?P<role>[a-z]{1,8}):(?P<inner>.+):(?P<kind>[a-z]{2})(?::\d+)?$")
 """`usr:Calculation_1737…:qk` — 역할 접두 + 종류 접미.
 
 역할은 소문자 짧은 토큰(`none`·`usr`·`sum`·`min`·`mn`·`yr`·`cnt`·`io`·`attr` …),
 종류는 2글자(`nk`·`qk`·`ok`)다. **목록으로 고정하지 않는다** — 목록에 없는 집계 접두사가
-하나만 나와도 그 필드가 통째로 dangling이 되기 때문이다 (D3.6 실측 분포)."""
+하나만 나와도 그 필드가 통째로 dangling이 되기 때문이다 (D3.6 실측 분포).
+
+꼬리의 `:숫자`는 같은 필드를 여러 번 올렸을 때 붙는 인스턴스 번호다
+(`usr:Calculation_1476…:qk:3` — 실측). 이름의 일부가 아니다."""
 
 SPECIAL_PREFIX = ":"
 """`[:Measure Names]`·`[:Measure Values]` — 필드가 아니라 Tableau 내장 축이다."""

@@ -43,6 +43,14 @@ def test_unknown_role_prefixes_are_still_stripped() -> None:
     assert ref.names[0] == "MyField"
 
 
+def test_instance_index_suffix_is_dropped() -> None:
+    """같은 필드를 여러 번 올리면 `:3`이 더 붙는다 (실측). 이름의 일부가 아니다."""
+    ref = fieldref.parse("[ds].[usr:Calculation_1476389873000452:qk:3]")
+
+    assert ref is not None
+    assert ref.names[0] == "Calculation_1476389873000452"
+
+
 def test_escaped_brackets_survive() -> None:
     """`]]`는 `]`의 이스케이프다 (실측: `[[P_Year]](복사본)_2403…]`)."""
     ref = fieldref.parse("[Parameters].[[P_Year]](복사본)_2403322090242050]")

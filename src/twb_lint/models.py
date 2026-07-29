@@ -152,6 +152,18 @@ class FieldDef:
     formula: str | None = None
     """계산필드면 수식, 일반 컬럼이면 None."""
 
+    origin: str = "column"
+    """이 이름이 어디서 왔는가. 규칙 ②의 참조 해소 범위를 결정한다 (03 D3.6.2).
+
+    | 값 | 출처 | 왜 필요한가 |
+    |---|---|---|
+    | `column` | `<datasource>/<column>` | 커스터마이즈된 필드만 여기 적힌다 |
+    | `metadata` | `<metadata-record class='column'>/<local-name>` | **손대지 않은 DB 컬럼** |
+    | `group` | `<datasource>/<group>` | 그룹/집합 |
+    | `instance` | `<datasource>/<column-instance>` | 집계 인스턴스 (`[min:x:qk]`) |
+
+    `column` 하나만 모으면 실사용 참조의 약 4%가 dangling으로 잡힌다 (실측 687/16,754)."""
+
     @property
     def is_calc(self) -> bool:
         return self.formula is not None

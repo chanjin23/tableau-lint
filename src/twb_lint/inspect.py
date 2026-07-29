@@ -115,14 +115,20 @@ def _fill(model: WorkbookModel, root: Any) -> None:
 
 
 def _datasource(el: Any) -> DataSource:
-    """데이터소스 하나 + 그 필드들.
+    """데이터소스 하나 + **참조 해소에 쓰이는 이름 전부** (03 D3.6.2).
 
-    `column`은 **직계 자식만** 본다. `.//column`으로 훑으면 `<datasource-dependencies>`
-    안의 참조 사본(다른 데이터소스의 필드)까지 이 데이터소스의 필드로 들어와,
-    규칙 ②가 남의 필드를 근거로 dangling을 놓친다 (실측: 직계 68 vs 전체 73).
+    `<column>`만 모으면 안 된다 — Tableau는 **커스터마이즈된 필드만** `<column>`으로
+    적는다. 손대지 않은 DB 컬럼은 `<metadata-record>`에만 있고, 그룹은 `<group>`,
+    집계 인스턴스는 `<column-instance>`에 있다. `<column>`만 보면 실사용 참조의 약 4%가
+    dangling으로 잡힌다 (실측 687/16,754 — 전부 거짓양성이다).
+
+    직계 자식만 본다. `.//`로 훑으면 `<datasource-dependencies>` 안의 참조 사본
+    (다른 데이터소스의 필드)까지 들어와, 규칙 ②가 남의 필드를 근거로 진짜 dangling을
+    놓친다 (실측: 직계 68 vs 전체 73).
     """
     name = el.get("name") or ""
     ds = DataSource(name=name, caption=el.get("caption"))
+
     for col in el.findall("column"):
         field_name = _unbracket(col.get("name"))
         if field_name is None:
@@ -134,7 +140,25 @@ def _datasource(el: Any) -> DataSource:
             datatype=col.get("datatype"),
             formula=None if calc is None else calc.get("formula"),
         )
+
+    # 아래는 전부 **덮어쓰지 않는다** — `<column>`이 더 많은 정보(수식·caption)를 갖는다.
+    for group in el.findall("group"):
+        _add_name(ds, _unbracket(group.get("name")), "group", caption=group.get("caption"))
+    for inst in el.findall("column-instance"):
+        _add_name(ds, _unbracket(inst.get("name")), "instance")
+    for record in el.iter("metadata-record"):
+        if record.get("class") != "column":
+            continue
+        local = record.find("local-name")
+        if local is not None:
+            _add_name(ds, _unbracket(local.text), "metadata")
     return ds
+
+
+def _add_name(ds: DataSource, name: str | None, origin: str, caption: str | None = None) -> None:
+    """참조 해소용 이름을 더한다. 이미 있으면 그대로 둔다."""
+    if name and name not in ds.fields:
+        ds.fields[name] = FieldDef(name=name, caption=caption, origin=origin)
 
 
 def _sheet_zones(dashboard: Any) -> tuple[str, ...]:

@@ -7,7 +7,7 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | ✅ 확정 |
-| 버전 | v1.6 (2026-07-29) |
+| 버전 | v1.7 (2026-07-29) |
 | 소유자 | ax3didim@gmail.com |
 | 전제 | [문제정의](./01-problem-definition.md)·[스펙](./02-specification.md) 확정 |
 | 다음 | 구현 (MVP) |
@@ -17,6 +17,7 @@
 | v1.4 변경 | **D9.1 신설** — `unpack`의 오류 전달 계약(`ArchiveError`) · zip bomb 2선 방어(선언 크기 ≠ 실제 해제량) |
 | v1.5 변경 | **D3.7 신설** — calc 수집을 Lark 문법 파서에서 어휘 스캐너로 뒤집었다 (수식 5,270건 실측: 함수 26종·화이트리스트 미매칭 0) |
 | v1.6 변경 | **D3.6.1 신설** — 표기 정규화 계약(`fieldref.py`): 후보 다중화 · 역할 접두사 비고정 · `]]` 이스케이프 · 특수 네임스페이스 3종 |
+| v1.7 변경 | **D3.6.2·D3.6.3 신설** — 필드 유니버스 4곳(미해소 687→94) · **규칙 ② 심각도를 ERROR→WARNING으로 내림**(정상 파일에도 잔재 dangling이 있다는 실측) |
 | 근거 | [`05-xsd-spike.md`](./05-xsd-spike.md) 실측, [`06-rule-candidates.md`](./06-rule-candidates.md) 규칙 인벤토리 |
 
 ---
@@ -148,9 +149,11 @@ lxml `error_log`의 오류 유형을 찍어 등급표를 만들려 했으나 **�
    - **심각도 = WARNING** (S1-6): 목록에 없음 = 우리 목록의 공백일 수 있다. ERROR로 막지 않는다
    - 파싱 실패 시 해당 calc의 하위 검사를 스킵하고 그 사실을 WARNING으로 보고
 2. **[MVP] calc 필드참조 해소** — `[Field]`·`[ds].[Field]` 참조 추출 → 데이터소스별 필드/calc 집합 대조.
-   - **특수 네임스페이스 예외 필수**: `[:Measure Names]`·`[:Measure Values]`·`[Parameters].[…]`·
-     집합/그룹/bin/계층. 과거 lint가 `[:Measure Names]`에서 오탐한 실측 이력이 있다(함정 S9)
-   - 해소 실패가 예외 목록 밖이면 ERROR, 예외 후보가 의심되면 WARNING
+   - **특수 네임스페이스 예외 필수**: `[:Measure Names]`·`[:Measure Values]`·`[Multiple Values]`·
+     `[__tableau_internal_object_id__].[…]`. 과거 lint가 `[:Measure Names]`에서 오탐했다(함정 S9)
+   - 대상 집합은 `<column>`만이 아니다 — **D3.6.2**의 네 곳을 전부 모은다
+   - **심각도 = WARNING** (v1.7 하향). 정상 파일에도 잔재 dangling이 있다는 실측 때문이다.
+     근거와 승격 조건은 **D3.6.3**
 3. **[MVP] named-content 참조무결성** — 구체 케이스로 정의(실측 기반, [`06-rule-candidates.md`](./06-rule-candidates.md) R2·R3):
    - 대시보드 worksheet 존 `name` ↔ `<worksheets>` 시트 정의 (dangling = ERROR, 고아 = WARNING)
    - 배치된 시트마다 대시보드 window `<viewpoints>/<viewpoint name>` 존재 (누락 = **내부 오류 2805CF18** = ERROR)
@@ -332,6 +335,46 @@ dangling이 된다.
 | `measure-axis` | `[:Measure Names]`·`[:Measure Values]` | 544회 (표본 10개) |
 | `placeholder` | `[Multiple Values]` | 158회 |
 | `internal-object-id` | `[__tableau_internal_object_id__].[…]` | 26회 |
+
+### D3.6.2 필드 유니버스 — `<column>`만 모으면 안 된다 (v1.7 — 2026-07-29 실측)
+
+Tableau는 **커스터마이즈된 필드만** `<column>`으로 적는다. 손대지 않은 DB 컬럼은
+`<column>`이 아예 없다. 참조 해소의 대상 집합은 네 곳에서 모은다:
+
+| 출처 | `FieldDef.origin` | 없으면 |
+|---|---|---|
+| `<datasource>/<column>` | `column` | — |
+| `<metadata-record class='column'>/<local-name>` | `metadata` | 평범한 DB 컬럼이 전부 dangling |
+| `<datasource>/<group>` | `group` | 그룹/집합이 dangling |
+| `<datasource>/<column-instance>` | `instance` | 집계 인스턴스가 dangling |
+
+실측 효과 (표본 10개, 참조 16,754건):
+
+| 단계 | 미해소 |
+|---|---|
+| `<column>`만 | 687 |
+| 네 곳 전부 + 인스턴스 번호(`:qk:3`) 처리 | **94** |
+
+### D3.6.3 ⚠️ 정상 파일에도 dangling 참조가 있다 — 규칙 ②는 ERROR를 낼 수 없다 (v1.7)
+
+남은 94건을 추적한 결과 **전부 정상 파일의 실제 잔재 참조**였다. 예: 삭제된 계산필드를
+가리키는 `format@field` 규칙이 5회 남아 있고, 그 파일은 Tableau에서 정상적으로 열린다.
+
+표면별 실측 (dangling / 전체):
+
+| 표면 | 비율 |
+|---|---|
+| `format@field` | 60 / 1,170 |
+| `column-instance@name` · `@column` | 9 / 2,462 each |
+| `calc@formula` | 8 / 8,310 |
+| `encoding@field` | 6 / 58 |
+| `filter@column` · `groupfilter@member` · `lod@column` · `computed-sort@using` | **0** |
+
+**결론: 규칙 ②의 심각도를 WARNING으로 내린다.** v1.1 설계는 "예외 목록 밖이면 ERROR"
+였으나, 그대로 두면 정상 골든셋 10/10이 ERROR를 뱉어 AC7이 즉시 무너진다.
+
+ERROR 승격은 **라벨링 배치(TODO D1~D4) 이후**로 미룬다 — "이 dangling이 있으면 안 열린다"를
+Tableau 실로드로 확인한 표면에 한해 올린다. dangling 0인 표면 4종이 유력한 후보다.
 
 ## D3.7 calc 수집은 **문법 파서가 아니라 어휘 스캐너**다 (v1.5 — 2026-07-29 실측)
 

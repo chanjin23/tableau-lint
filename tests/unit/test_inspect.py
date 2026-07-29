@@ -74,6 +74,73 @@ def test_fields_are_collected_without_brackets(tmp_path: Path) -> None:
     }
 
 
+def test_the_field_universe_is_not_just_column_elements(tmp_path: Path) -> None:
+    """Tableau는 **커스터마이즈된 필드만** `<column>`으로 적는다 (03 D3.6.2).
+
+    손대지 않은 DB 컬럼은 `<metadata-record>`에만 있다. `<column>`만 모으면 실사용
+    참조의 약 4%가 dangling으로 잡힌다 — 전부 거짓양성이다 (실측 687/16,754).
+    """
+    xml = make_twb(
+        extra_body=(
+            "<datasources><datasource name='federated.abc'>"
+            "<column datatype='real' name='[Calculation_1]'>"
+            "<calculation class='tableau' formula='1' /></column>"
+            "<group name='[Grp]' caption='그룹' />"
+            "<column-instance column='[accs_code]' name='[min:accs_code:qk]' />"
+            "<connection><metadata-records>"
+            "<metadata-record class='column'><local-name>[accs_code]</local-name></metadata-record>"
+            "<metadata-record class='capability'><local-name>[nope]</local-name></metadata-record>"
+            "</metadata-records></connection>"
+            "</datasource></datasources>"
+        )
+    )
+
+    ds = model_of(tmp_path, xml).datasources["federated.abc"]
+
+    assert {n: f.origin for n, f in ds.fields.items()} == {
+        "Calculation_1": "column",
+        "Grp": "group",
+        "min:accs_code:qk": "instance",
+        "accs_code": "metadata",
+    }
+    assert ds.fields["Grp"].caption == "그룹"
+
+
+def test_column_elements_win_over_the_other_origins(tmp_path: Path) -> None:
+    """`<column>`이 수식·caption을 갖는다 — 다른 출처가 덮어쓰면 그 정보가 사라진다."""
+    xml = make_twb(
+        extra_body=(
+            "<datasources><datasource name='ds'>"
+            "<column datatype='real' name='[x]' caption='진짜'>"
+            "<calculation class='tableau' formula='SUM([y])' /></column>"
+            "<connection><metadata-records>"
+            "<metadata-record class='column'><local-name>[x]</local-name></metadata-record>"
+            "</metadata-records></connection>"
+            "</datasource></datasources>"
+        )
+    )
+
+    field = model_of(tmp_path, xml).datasources["ds"].fields["x"]
+
+    assert field.origin == "column"
+    assert field.formula == "SUM([y])"
+
+
+def test_escaped_brackets_in_column_names_are_unescaped(tmp_path: Path) -> None:
+    """`]]`는 `]`의 이스케이프다 — 벗기지 않으면 참조 쪽과 표기가 어긋난다 (D3.6.1)."""
+    xml = make_twb(
+        extra_body=(
+            "<datasources><datasource name='Parameters'>"
+            "<column datatype='integer' name='[[P_Year]](복사본)_2403]' />"
+            "</datasource></datasources>"
+        )
+    )
+
+    ds = model_of(tmp_path, xml).datasources["Parameters"]
+
+    assert set(ds.fields) == {"[P_Year](복사본)_2403"}
+
+
 def test_nested_dependency_columns_are_not_this_datasources_fields(tmp_path: Path) -> None:
     """`<datasource-dependencies>`는 **남의 필드**다.
 
