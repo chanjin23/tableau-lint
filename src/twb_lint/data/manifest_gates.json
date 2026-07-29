@@ -1,8 +1,20 @@
 {
-  "schema": 1,
-  "note": "기능 요소 ↔ <document-format-change-manifest> 항목 대응표 (L-B 규칙 ⑥). 유효 문법 = version 선언 × 매니페스트 항목 집합이라, 기능을 쓰면서 대응 항목을 선언하지 않으면 로드 거부된다. 공식 XSD는 이 요소들을 무조건 허용하므로 L-A가 원리적으로 못 잡는다.",
+  "schema": 2,
+  "note": "기능 ↔ <document-format-change-manifest> 항목 대응 (L-B 규칙 ⑥). 유효 문법 = version 선언 × 매니페스트 항목 집합이라, 기능을 쓰면서 대응 항목을 선언하지 않으면 로드 거부된다. 공식 XSD는 이 요소들을 무조건 허용하므로 L-A가 원리적으로 못 잡는다.",
   "policy": "표에 있는 기능만 ERROR로 판정한다. 표에 없는 요소를 추측해 ERROR를 내지 않는다 (docs/02-specification.md S1-6).",
-  "provenance": "docs/05-xsd-spike.md F5 · docs/06-rule-candidates.md R1",
+  "provenance": "docs/05-xsd-spike.md F5·F7 · docs/06-rule-candidates.md R1",
+
+  "fcp_rule": {
+    "note": "규칙 ⑥-a. fcp 계열은 대응표가 필요 없다 — 기능명이 이름 안에 박혀 있어 구조에서 도출된다. 트리에 `_.fcp.<F>.<true|false>...<이름>`이 있으면 매니페스트에 `_.fcp.<F>.true...<F>`가 있어야 한다. 표본 10/10 일치 (05 F7).",
+    "input": "정규화 **전** 원본 트리. fcp 정규화가 요소의 소속 기능을 지운다 (05 F7 함의 2).",
+    "severity": "인과(항목 삭제 → 실제 로드 거부) 미검증이라 WARNING. 실험 A로 확정되면 ERROR.",
+    "observed_features": [
+      "DashboardRoundedCorners",
+      "IndividualControlFormatting",
+      "VConnDownstreamExtractsWithWarnings"
+    ]
+  },
+
   "gates": [
     {
       "element": "manual-sort",
@@ -16,5 +28,27 @@
       "symptom": "no declaration found for element 'edit-group-action'",
       "source": "docs/06-rule-candidates.md R1 (함정 I7)"
     }
-  ]
+  ],
+
+  "known_items_unmapped": {
+    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다.",
+    "items": [
+      "AccessibleZoneTabOrder",
+      "AnimationOnByDefault",
+      "AutoCreateAndUpdateDSDPhoneLayouts",
+      "MarkAnimation",
+      "ObjectModelEncapsulateLegacy",
+      "ObjectModelExtractV2",
+      "ObjectModelTableType",
+      "ParameterAction",
+      "ParameterActionClearSelection",
+      "ParameterDefaultValues",
+      "SchemaViewerObjectModel",
+      "SetMembershipControl",
+      "SheetIdentifierTracking",
+      "WindowsPersistSimpleIdentifiers",
+      "WorksheetBackgroundTransparency",
+      "ZoneBackgroundTransparency"
+    ]
+  }
 }
