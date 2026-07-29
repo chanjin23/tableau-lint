@@ -9,6 +9,7 @@ zip slip은 `safe_extract_path()`, zip bomb은 `check_zip_entry()`다 (docs/03-d
 
 from __future__ import annotations
 
+import shutil
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +19,13 @@ from twb_lint.io import safety
 
 _CHUNK = 1024 * 1024
 """해제 시 한 번에 읽는 크기. 통째로 `read()`하면 zip bomb이 상한 검사 전에 메모리를 먹는다."""
+
+_FIXED_TIME = (1980, 1, 1, 0, 0, 0)
+"""pack이 모든 엔트리에 쓰는 타임스탬프 (ZIP의 최소값).
+
+**같은 디렉토리를 두 번 묶으면 바이트가 같아야 한다** (결정론 — 02 S1-5). 파일 mtime을
+쓰면 매번 달라진다. 원본 타임스탬프는 어차피 unpack 시점에 사라지므로(추출된 파일의
+mtime은 추출 시각이다) 보존할 정보가 아니라, 재현성을 택했다."""
 
 
 class ArchiveError(safety.InputError):
@@ -76,8 +84,42 @@ def unpack(path: Path, dest: Path) -> Unpacked:
 
 
 def pack(root: Path, out: Path) -> Path:
-    """디렉토리를 `.twbx`로 다시 묶는다 (.hyper 무손실)."""
-    raise NotImplementedError("scaffold: twbx.pack")
+    """디렉토리를 `.twbx`로 다시 묶는다 (`.hyper` 무손실). 반환은 쓴 경로.
+
+    `.hyper`는 **무압축(ZIP_STORED)** 으로 넣는다. 내부적으로 이미 압축된 포맷이라
+    deflate가 얻는 것이 거의 없고, 바이트를 그대로 흘려보내는 경로가 "재압축하지
+    않는다"(07 G6)를 코드로 보장한다. 나머지는 deflate — `.twb` XML은 잘 줄어든다.
+
+    `.twb`를 **첫 엔트리로** 둔다 (실파일 배치와 같다). 나머지는 경로 정렬이라
+    같은 디렉토리는 항상 같은 순서로 묶인다.
+
+    Raises:
+        ArchiveError: `.twb`가 없을 때. `.twb` 없는 `.twbx`는 Tableau가 열지 못하므로
+            조용히 만들어 내보내면 안 된다.
+    """
+    files = sorted(
+        (p for p in root.rglob("*") if p.is_file()),
+        key=lambda p: (p.suffix.lower() != ".twb", p.relative_to(root).as_posix()),
+    )
+    if not any(p.suffix.lower() == ".twb" for p in files):
+        raise ArchiveError(
+            safety.InputProblem(
+                safety.ProblemKind.CORRUPT_ARCHIVE,
+                f"묶을 `.twb`가 없다: {root}",
+                fix="unpack한 디렉토리를 그대로 넘긴다.",
+            )
+        )
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(out, "w") as zf:
+        for path in files:
+            info = zipfile.ZipInfo(path.relative_to(root).as_posix(), date_time=_FIXED_TIME)
+            info.compress_type = (
+                zipfile.ZIP_STORED if path.suffix.lower() == ".hyper" else zipfile.ZIP_DEFLATED
+            )
+            with path.open("rb") as src, zf.open(info, "w") as dst:
+                shutil.copyfileobj(src, dst, _CHUNK)
+    return out
 
 
 def _extract_all(zf: zipfile.ZipFile, dest: Path) -> list[Path]:

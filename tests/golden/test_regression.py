@@ -95,11 +95,6 @@ def test_inspector_extracts_a_non_empty_model_from_every_workbook(
             assert placed <= dash.viewpoints, f"{path.name}/{dash.name}: viewpoint 누락"
 
 
-@pytest.mark.xfail(
-    raises=NotImplementedError,
-    strict=True,
-    reason="io.twbx.unpack/pack 미구현 — 구현되면 XPASS로 바뀌고 이 마커를 제거한다",
-)
 def test_c4_hyper_survives_a_roundtrip_byte_for_byte(
     require_golden_normal: list[Path], tmp_path: Path
 ) -> None:

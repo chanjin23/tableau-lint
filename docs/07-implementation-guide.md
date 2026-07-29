@@ -189,7 +189,7 @@ VS Code: **Ctrl+Shift+B** = 게이트 전체. F5 = 디버그 실행(CLI·MCP·py
 기대 출력 (2026-07-29 기준):
 
 ```
-67 passed, 8 skipped
+99 passed, 9 skipped
 All checks passed!
 Success: no issues found in 43 source files
 ```
@@ -240,7 +240,8 @@ export TWB_LINT_GOLDEN_NORMAL='C:/dev/JW/2.개발/MA_002_경영관리-재무-현
 $env:TWB_LINT_GOLDEN_NORMAL = 'C:\dev\JW\2.개발\MA_002_경영관리-재무-현금흐름\*.twbx;C:\dev\JW\2.개발\MA_004_경영관리-재무-손익계산서\*_JWLH_*.twbx;C:\dev\태블로판차분석_제약_260616_진행중_2.twbx'
 ```
 
-설정하면 `pytest -q`가 74 passed + 1 xfailed가 된다(xfail = AC8, `io` 미구현).
+설정하면 `pytest -q`가 108 passed가 된다. AC8(`.hyper` 라운드트립)은 io 1단계가
+끝나 xfail에서 풀렸다 — 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
 
 ### 규칙을 구현·추가했을 때 추가로 할 것
 
@@ -326,11 +327,11 @@ XSD로 검증하게 되고 정상본이 전부 ERROR가 난다. 상류 갱신 �
 착수 전 준비는 끝났다. **설계 미결 8건 해소 · vendored XSD · 함수 목록 218종 ·
 테스트 3층 · 주입 스크립트**가 모두 자리에 있다.
 
-1. `io/twbx.unpack`·`io/twb.parse` → `inspect.load_context` 실채움 ← **다음**
+1. ~~`io/twbx.unpack`·`io/twb.parse` → `inspect.load_context` 실채움~~ ✅
    - 모델과 `raw_tree`가 채워져야 나머지 규칙이 전부 돈다. 여기가 병목이다
    - 파서는 `safety.make_parser()`, ZIP은 `safe_extract_path`/`check_zip_entry`를 통과시킨다
-   - 완료 신호: AC8 테스트(`test_c4_hyper_survives_a_roundtrip`)가 xfail → 통과로 바뀐다
-2. `syntactic/xsd.py` — 스키마 로드(캐시) + `severity_for()` 적용. 정책과 vendoring은 이미 있다
+   - **완료** (2026-07-29). AC8 테스트가 xfail → 통과로 뒤집혔고 마커를 제거했다
+2. `syntactic/xsd.py` — 스키마 로드(캐시) + `severity_for()` 적용 ← **다음**. 정책과 vendoring은 이미 있다
    - **첫 목표는 정상 9개 ERROR 0건.** 주입본 R4·R7이 ERROR로 잡히면 성공
 3. `calc/extractor.py` + 규칙 ①② — 표면은 D3.6에 확정돼 있다. 표기 정규화(G8)가 핵심
 4. 규칙 ③(R2·R3 3자 대조) / 규칙 ⑥(⑥-a는 `fcp` 모듈이 이미 다 준다)

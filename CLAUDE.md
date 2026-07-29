@@ -4,8 +4,9 @@
 공식 XSD(구문) 위에 시맨틱 검증기를 얹어, Tableau를 실행하지 않고 "이 파일이 열리는가"를 판정한다.
 
 대상: Tableau **2026.1 단독 · 로컬 오프라인**.
-현 단계: **구현 착수 준비 완료** — 설계 미결 8건 해소 · 데이터·테스트 인프라 확보. 규칙 로직은 stub.
-다음은 [`TODO.md`](./TODO.md) "다음 한 걸음" — `io` 실로직(파싱·unpack)이 병목이다.
+현 단계: **io 1단계 완료** — unpack/pack · 파싱 · 모델 추출이 실로직이다 (AC8 통과).
+**규칙 로직은 아직 stub.** 다음은 L-A(`syntactic/xsd.py`) 배선.
+진행 상황은 [`docs/impl-progress.md`](./docs/impl-progress.md)가 갖는다.
 
 ## 작업 전 반드시 읽는다
 
@@ -20,13 +21,13 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 67 passed, 8 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 99 passed, 9 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
 .venv/Scripts/python -m mypy             # Success: no issues in 43 source files
 ```
 
 하나라도 깨지면 커밋하지 않는다. 규칙을 구현했으면 **실파일 회귀**까지 —
-골든셋 경로를 환경변수로 걸면 `74 passed, 1 xfailed`가 된다 (xfail = AC8, io 구현 시 해제).
+골든셋 경로를 환경변수로 걸면 `108 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
 절차는 [`07-implementation-guide.md`](./docs/07-implementation-guide.md) §2.
 
 ```bash

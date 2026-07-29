@@ -116,6 +116,68 @@ def test_a_lying_header_is_caught_while_copying(
     assert exc.value.problem.kind is safety.ProblemKind.UNSAFE_ARCHIVE
 
 
+def test_roundtrip_preserves_hyper_bytes(tmp_path: Path) -> None:
+    """C4 — unpack→pack에서 `.hyper`는 **바이트 단위로 동일**하다 (07 G6)."""
+    src = make_twbx(tmp_path / "wb.twbx", {"wb.twb": TWB, "Data/extract.hyper": HYPER})
+
+    unpacked = twbx.unpack(src, tmp_path / "out")
+    repacked = twbx.pack(unpacked.root, tmp_path / "again" / "wb.twbx")
+
+    with zipfile.ZipFile(repacked) as zf:
+        assert zf.read("Data/extract.hyper") == HYPER
+        assert zf.read("wb.twb") == TWB
+
+
+def test_pack_is_deterministic(tmp_path: Path) -> None:
+    """같은 디렉토리는 항상 같은 바이트로 묶인다 — 골든셋 diff 노이즈 방지 (02 S1-5)."""
+    src = make_twbx(tmp_path / "wb.twbx", {"wb.twb": TWB, "Data/extract.hyper": HYPER})
+    root = twbx.unpack(src, tmp_path / "out").root
+
+    first = twbx.pack(root, tmp_path / "a.twbx").read_bytes()
+    second = twbx.pack(root, tmp_path / "b.twbx").read_bytes()
+
+    assert first == second
+
+
+def test_pack_puts_the_twb_first_and_stores_hyper_uncompressed(tmp_path: Path) -> None:
+    """`.hyper`는 이미 압축된 포맷이다 — 무압축이 "재압축하지 않는다"를 코드로 보장한다."""
+    src = make_twbx(tmp_path / "wb.twbx", {"Data/extract.hyper": HYPER, "wb.twb": TWB})
+    root = twbx.unpack(src, tmp_path / "out").root
+
+    with zipfile.ZipFile(twbx.pack(root, tmp_path / "again.twbx")) as zf:
+        infos = zf.infolist()
+
+    assert infos[0].filename == "wb.twb"
+    assert {i.filename: i.compress_type for i in infos} == {
+        "wb.twb": zipfile.ZIP_DEFLATED,
+        "Data/extract.hyper": zipfile.ZIP_STORED,
+    }
+
+
+def test_pack_refuses_a_directory_without_a_twb(tmp_path: Path) -> None:
+    """`.twb` 없는 `.twbx`는 Tableau가 열지 못한다 — 조용히 만들어 내보내지 않는다."""
+    root = tmp_path / "root"
+    (root / "Data").mkdir(parents=True)
+    (root / "Data" / "extract.hyper").write_bytes(HYPER)
+
+    with pytest.raises(twbx.ArchiveError) as exc:
+        twbx.pack(root, tmp_path / "out.twbx")
+
+    assert exc.value.problem.kind is safety.ProblemKind.CORRUPT_ARCHIVE
+
+
+def test_repacked_archive_can_be_unpacked_again(tmp_path: Path) -> None:
+    """pack 결과가 unpack 정책을 다시 통과한다 — 우리 출력이 우리 입력이 된다."""
+    src = make_twbx(tmp_path / "wb.twbx", {"wb.twb": TWB, "Data/extract.hyper": HYPER})
+    root = twbx.unpack(src, tmp_path / "out").root
+    repacked = twbx.pack(root, tmp_path / "again.twbx")
+
+    got = twbx.unpack(repacked, tmp_path / "out2")
+
+    assert got.twb_path.read_bytes() == TWB
+    assert (got.root / "Data" / "extract.hyper").read_bytes() == HYPER
+
+
 def test_corrupt_archive_is_reported_not_crashed(tmp_path: Path) -> None:
     src = tmp_path / "broken.twbx"
     src.write_bytes(b"not a zip at all")
