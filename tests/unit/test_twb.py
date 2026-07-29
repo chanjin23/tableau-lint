@@ -96,7 +96,7 @@ def test_serialize_roundtrips_structure_and_non_ascii(tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "현금흐름" in text
     reparsed = twb.parse(out)
-    assert reparsed.find("datasource").get("caption") == "현금흐름"
+    assert reparsed.find("datasources/datasource").get("caption") == "현금흐름"
     assert [w.get("name") for w in reparsed.iter("worksheet")] == ["시트 1"]
 
 

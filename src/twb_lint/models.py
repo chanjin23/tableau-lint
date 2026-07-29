@@ -218,7 +218,8 @@ class WorkbookModel:
     """`<workbook original-version>` 값."""
 
     manifest_features: frozenset[str] = frozenset()
-    """`<document-format-change-manifest>`의 항목 이름 집합 (fcp 접두사 제거 후).
+    """`<document-format-change-manifest>`의 항목 이름 집합. **원문 그대로** — 접두사를
+    벗기면 `_.fcp.X.true...X`와 `_.fcp.X.false...X`가 구분되지 않는다 (05 F7).
 
     유효 문법 = `version` × 이 집합. 기능을 쓰면서 대응 항목을 선언하지 않으면
     `no declaration found for element`로 로드 거부된다 (규칙 ⑥, 05-xsd-spike.md F5)."""

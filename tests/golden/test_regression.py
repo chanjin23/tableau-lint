@@ -70,6 +70,31 @@ def test_vendored_xsd_accepts_every_known_good_twb(require_golden_normal: list[P
     assert not failures, "vendored XSD가 정상본을 거부했다:\n" + "\n".join(failures)
 
 
+def test_inspector_extracts_a_non_empty_model_from_every_workbook(
+    require_golden_normal: list[Path], tmp_path: Path
+) -> None:
+    """인스펙터 실파일 회귀 — 추출이 조용히 비어도 게이트는 green이다.
+
+    규칙은 모델만 본다. 추출 경로가 하나 어긋나면 findings가 0건이 되고 그것이
+    "문제없음"처럼 보인다 (02 S5의 실체). 여기서 최소 사실만 고정한다.
+
+    `zone ⊆ worksheets`와 `viewpoint ⊇ zone`은 규칙 ③이 정상본에서 침묵해야 한다는
+    뜻이다 — 실측 10/10이 이 관계를 만족한다. 깨지면 규칙 ③이 AC7을 위반한다.
+    """
+    from twb_lint import inspect as inspector
+
+    for i, path in enumerate(require_golden_normal):
+        model = inspector.inspect(path, tmp_path / str(i))
+        assert model.source_build, f"{path.name}: source-build가 없다 (XSD 선택 키)"
+        assert model.manifest_features, f"{path.name}: 매니페스트가 비었다"
+        assert model.datasources, f"{path.name}: 데이터소스가 비었다"
+        assert model.worksheets, f"{path.name}: 워크시트가 비었다"
+        for dash in model.dashboards.values():
+            placed = set(dash.sheet_zones)
+            assert placed <= model.worksheets, f"{path.name}/{dash.name}: 존이 시트를 벗어난다"
+            assert placed <= dash.viewpoints, f"{path.name}/{dash.name}: viewpoint 누락"
+
+
 @pytest.mark.xfail(
     raises=NotImplementedError,
     strict=True,

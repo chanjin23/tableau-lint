@@ -112,8 +112,12 @@ def make_twb(
         items = "".join(f"<{name} />" for name in manifest)
         parts.body.append(f"<document-format-change-manifest>{items}</document-format-change-manifest>")
 
-    for ds in datasources:
-        parts.body.append(_datasource_xml(ds))
+    if datasources:
+        # 실파일은 `workbook/datasources/datasource`다. 래퍼를 빼면 인스펙터의 경로와
+        # 어긋나 픽스처만 통과하는 테스트가 된다.
+        parts.body.append(
+            f"<datasources>{''.join(_datasource_xml(ds) for ds in datasources)}</datasources>"
+        )
 
     if worksheets:
         sheets = "".join(f"<worksheet name={quoteattr(w)} />" for w in worksheets)
@@ -179,8 +183,14 @@ def _datasource_xml(ds: Ds) -> str:
 def _dashboards_xml(dashboards: tuple[Dash, ...]) -> str:
     out = []
     for d in dashboards:
-        zones = "".join(f"<zone name={quoteattr(z)} type-v2='layout-basic' />" for z in d.zones)
-        out.append(f"<dashboard name={quoteattr(d.name)}><zones>{zones}</zones></dashboard>")
+        # 시트 존은 `name`만 갖는다 — `type-v2`가 붙은 존은 레이아웃 컨테이너다
+        # (실측: 이름 있는 존 90/90이 워크시트, 전부 type-v2 없음). 여기서 type-v2를
+        # 달면 인스펙터가 시트 존으로 세지 않아 픽스처가 실파일과 다른 사실을 고정한다.
+        zones = "".join(f"<zone name={quoteattr(z)} />" for z in d.zones)
+        out.append(
+            f"<dashboard name={quoteattr(d.name)}>"
+            f"<zones><zone type-v2='layout-basic'>{zones}</zone></zones></dashboard>"
+        )
     return f"<dashboards>{''.join(out)}</dashboards>"
 
 

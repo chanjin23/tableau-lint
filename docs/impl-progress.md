@@ -24,9 +24,10 @@ xfail 1건 = AC8(`.hyper` 라운드트립 바이트 동일성). **1단계 완료
 - [x] **1b. `io/twb.parse` / `read_version` / `serialize`** — 파서는 `safety.make_parser()`만.
       실패는 `MalformedXmlError`(= `safety.InputError`). `read_version` 독스트링이
       "XSD 버전 매칭용"이라 G1과 어긋나 있었다 — 바로잡았다(용도는 규칙 ⑥)
-- [ ] **1c. `inspect.load_context`** — `raw_tree` + `source_build`·`twb_version`·
-      `manifest_features`·`datasources`·`worksheets` 채움.
-      매니페스트 항목은 **원문 그대로**(fcp 접두사 유지 — `.true...`/`.false...` 구분이 사라진다)
+- [x] **1c. `inspect.load_context`** — `raw_tree` + 버전 3종 · `manifest_features`(원문 그대로) ·
+      `datasources`(직계 `column`만) · `worksheets`/`dashboards`/`worksheet_windows` 채움.
+      실측 10/10에서 `zone ⊆ worksheets ∧ zone ⊆ viewpoints` — 규칙 ③이 정상본에서
+      침묵해야 한다는 뜻이고, 골든셋 회귀가 이 관계를 고정한다
 - [ ] **1d. `io/twbx.pack`** — AC8 xfail 해제
 
 ## 2. L-A (구문 검증)
@@ -68,3 +69,4 @@ xfail 1건 = AC8(`.hyper` 라운드트립 바이트 동일성). **1단계 완료
 | 0 | 대장 생성 | 74 passed, 1 xfailed | — | baseline 실측 확인 |
 | 1 | 1a `twbx.unpack` | 84 passed, 1 xfailed | 0 | 골든셋 10개 실해제 확인(각 <0.01s, 4엔트리). AC8은 `pack` 미구현이라 xfail 유지 |
 | 2 | 1b `twb.parse`/`read_version`/`serialize` | 92 passed, 1 xfailed | 0 | io 예외를 `safety.InputError`로 통일(03 D9.1). XXE가 `parse()` 경로를 실제로 통과하는지 파일로 검사 |
+| 3 | 1c `load_context` 모델 실채움 | 102 passed, 1 xfailed | 0 | 골든셋 10개 추출 실측: ds 2~5 · 필드 73~240 · calc 56~111 · ws=win=zone=vp 전부 일치. **픽스처 결함 2건**(`<datasources>` 래퍼 누락 · 시트 존에 `type-v2`)을 실측 기준으로 교정 |
