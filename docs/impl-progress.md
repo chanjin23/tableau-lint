@@ -9,7 +9,7 @@
 
 **현재** (2026-07-29, 골든셋 걸고 실측): `170 passed` ·
 `ruff All checks passed!` · `mypy Success: no issues found in 54 source files`
-(골든셋 미설정 시 `158 passed, 12 skipped`)
+(골든셋 미설정 시 `157 passed, 13 skipped`)
 
 ## 🏁 07 §4의 1~4단계 전부 완료
 

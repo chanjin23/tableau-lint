@@ -22,7 +22,7 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 158 passed, 12 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 157 passed, 13 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
 .venv/Scripts/python -m mypy             # Success: no issues in 54 source files
 ```

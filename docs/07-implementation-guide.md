@@ -189,7 +189,7 @@ VS Code: **Ctrl+Shift+B** = 게이트 전체. F5 = 디버그 실행(CLI·MCP·py
 기대 출력 (2026-07-29 기준):
 
 ```
-158 passed, 12 skipped
+157 passed, 13 skipped
 All checks passed!
 Success: no issues found in 54 source files
 ```
