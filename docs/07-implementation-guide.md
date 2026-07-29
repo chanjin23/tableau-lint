@@ -77,6 +77,17 @@ fcp는 Tableau 하위호환 장치다. 오류의 98%가 이것이었다(파일�
 공식 XSD는 `manual-sort`를 무조건 허용한다 → **L-A를 통과하고 Tableau에서 안 열린다.**
 AC3(무거짓통과) 위반의 실증 사례이자 규칙 ⑥의 존재 이유. (근거: 05 F5, [`06`](./06-rule-candidates.md) R1)
 
+**fcp 계열은 표가 필요 없다** (05 F7). 매니페스트 항목 이름에도 fcp 접두사가 붙어서,
+`_.fcp.<F>....`를 쓰면 `_.fcp.<F>.true...<F>` 항목이 있어야 한다는 규칙이 구조에서 나온다.
+
+```
+_.fcp.DashboardRoundedCorners.true...format                    ← 사용 요소
+_.fcp.DashboardRoundedCorners.true...DashboardRoundedCorners   ← 필요한 매니페스트 항목
+```
+
+⚠️ **G2의 fcp 정규화가 이 정보를 지운다** (`…...format` → `format`). 규칙 ⑥-a는
+**정규화 전 원본 트리**에서 돌려야 한다 — L-A(정규화 후 사본)와 입력이 다르다.
+
 ### G5. 필드 참조는 네임스페이스가 있다
 
 참조는 `[datasource].[Field]`다. 플랫 `set[str]`으로 대조하면 동명 필드에서

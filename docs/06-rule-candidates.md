@@ -40,23 +40,45 @@
 
 ## A. 로드 거부/크래시 — ERROR 후보
 
-### R1. 매니페스트 미선언 기능 사용 [L-B · MVP 승격 검토]
+### R1. 매니페스트 미선언 기능 사용 [L-B · MVP]
 
 - **증상**: `no declaration found for element '<요소>'` + content model 나열 → 로드 거부
 - **조건**: `<document-format-change-manifest>`에 대응 기능 항목 없이 그 기능의 요소를 사용
-- **실측 쌍**:
-  - `<manual-sort>` ↔ `SortTagCleanup` (함정 W2 / 05-xsd-spike F5)
-  - `<edit-group-action>` ↔ `GroupAction` + `GroupActionAddRemove` (함정 I7)
 - **왜 중요한가**: **XSD가 원리적으로 못 잡는다.** 공식 XSD는 `manual-sort`를 무조건 허용하므로
   이 파일은 **L-A를 통과하고 Tableau에서 안 열린다** → AC3(무거짓통과) 위반의 실증 사례
-- **구현**: 기능↔매니페스트 항목 대응표를 데이터로 유지(`data/manifest_gates.json`),
-  트리에서 게이팅 대상 요소를 찾아 매니페스트 대조
-- **한계**: 대응표가 불완전하다 → 표에 있는 기능만 ERROR, 나머지는 검사 안 함(침묵).
-  표에 없는 요소를 추측해서 ERROR 내지 않는다
 - **비고**: 과거 lint는 W2를 WARN으로 격하했다 —
   *"수제 생성본만 로드 거부되고 Tableau 저장본은 정상이라 게이트 불가"*.
   게이팅 조건(매니페스트 항목)을 몰랐기 때문이다. **조건을 알면 ERROR로 정밀화할 수 있다** —
   twb-lint가 기존 자산보다 나아지는 첫 지점
+
+**2026-07-29 실측([`05-xsd-spike.md`](./05-xsd-spike.md) F7)으로 두 갈래로 쪼개진다.**
+
+#### R1-a. fcp 계열 — 대응표 불필요 [MVP · 지금 구현 가능]
+
+매니페스트 항목 이름 **자체에도 fcp 접두사가 붙는다.** 접두사를 벗기면 트리의 fcp
+기능명과 10/10 파일에서 완전 일치한다.
+
+```xml
+<_.fcp.DashboardRoundedCorners.true...DashboardRoundedCorners />   <!-- 매니페스트 -->
+<_.fcp.DashboardRoundedCorners.true...format />                     <!-- 사용 요소 -->
+```
+
+- **규칙**: `_.fcp.<F>....`를 쓰면 매니페스트에 `_.fcp.<F>.true...<F>`가 있어야 한다
+- **표가 필요 없다** — 기능명이 이름 안에 박혀 있어 자기 자신에서 도출된다
+- ⚠️ **입력은 정규화 전 원본 트리.** fcp 정규화가 요소의 소속 기능을 지운다 (F7 함의 2)
+- **심각도**: 인과 확정(실험 A) 전까지 WARNING. 확정되면 ERROR (S1-6)
+
+#### R1-b. 일반 계열 — 대응표 필요 [MVP · 표 2쌍뿐]
+
+이름이 요소명과 다르다 → 표로만 풀린다.
+
+- **실측 쌍**: `<manual-sort>` ↔ `SortTagCleanup` (함정 W2 / F5),
+  `<edit-group-action>` ↔ `GroupAction` + `GroupActionAddRemove` (함정 I7)
+- **항목 이름 19종은 확보됨**(F7 함의 3) — 모르는 것은 **각 항목 ↔ 어느 요소**인가
+- **구현**: `data/manifest_gates.json` 대조
+- **한계**: 표에 있는 기능만 ERROR, 나머지는 검사 안 함(침묵).
+  표에 없는 요소를 추측해서 ERROR 내지 않는다
+- **확장 경로**: 실험 B(§D) → 실패 시 D8(`.rcc` 역수확)
 
 ### R2. 대시보드 시트 배치 ↔ window viewpoint 불일치 [L-B · MVP = rule ③]
 
@@ -172,7 +194,8 @@
 
 | 규칙 | 주입 방법 | 기대 라벨 |
 |---|---|---|
-| R1 | 매니페스트에서 `SortTagCleanup` 삭제 (`manual-sort`는 유지) | 로드 거부 |
+| R1-b | 매니페스트에서 `SortTagCleanup` 삭제 (`manual-sort`는 유지) | 로드 거부 |
+| R1-a | 매니페스트에서 `_.fcp.DashboardRoundedCorners…` 삭제 (사용 요소는 유지) | 로드 거부(미검증 — 실험 A) |
 | R2 | 대시보드 window `<viewpoints>`에서 viewpoint 1개 삭제 | 내부 오류 2805CF18 |
 | R3 | 존의 `name`을 없는 시트명으로 변경 | 로드 거부 |
 | R4 | ds에서 `<style>`을 `<column>` 앞으로 이동 | D2E8DA72 |
@@ -182,3 +205,23 @@
 실제로 열어 라벨을 확정한다(로컬 전용 — Cloud REST API 검증은 사용 불가).
 
 이 방식이면 D5의 "규칙별 고장 케이스 ≥3"을 손으로 워크북을 만들지 않고 채울 수 있다.
+
+### D.1 주입은 라벨링만 하는 게 아니다 — 대응표를 캔다 (2026-07-29)
+
+R1-b의 미지수는 "**어느 항목이 어느 요소를 게이팅하는가**"다. 그런데 로드 거부 메시지가
+그 답을 직접 뱉는다:
+
+```
+no declaration found for element 'manual-sort'
+                                  ^^^^^^^^^^^ 대응 요소
+```
+
+→ **실험 B**: 확보된 항목 19종을 하나씩 지운 파일을 만들어 연다.
+거부되면 메시지에서 대응 요소를 읽는다. 열리면 그 파일이 해당 기능을 안 쓴다는 뜻이며,
+그것도 정보다(다른 표본에서 재시도).
+
+**Tableau가 대응표를 스스로 불러준다.** 배치 1회로 2쌍 → 최대 20쌍.
+성공하면 D8(`.rcc` 26MB 역수확)이 불필요해질 수 있다.
+
+전제: *"매니페스트 항목 추가 자체는 무해"*(함정 I1 격리 실험)의 **역방향은 미검증**이다 —
+삭제가 항상 거부를 유발하는지는 실험이 답한다.
