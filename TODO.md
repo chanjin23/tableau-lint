@@ -6,131 +6,138 @@
 > 권위 문서는 `docs/`다. 여기는 **작업 목록**일 뿐 결정의 근거가 아니다 —
 > 각 항목은 근거 문서를 가리킨다. 결정이 나면 **먼저 `docs/`를 고치고** 여기에 체크한다.
 
-현 지점: 스캐폴딩 + 스파이크 완료. 규칙 로직 전부 stub.
+현 지점 (2026-07-29): **구현 착수 준비 완료.** 설계 미결 8건 해소 · 데이터 확보 ·
+테스트 3층 · 주입 스크립트까지 끝났다. 규칙 로직은 여전히 stub이다.
+
+**남은 것은 두 종류뿐이다** — ① 사람이 Tableau를 열어야 하는 라벨링(D) ② 그것에 의존하는 측정(B4).
+나머지는 전부 구현 단계로 넘어간다.
 
 ---
 
-## A. 설계 결정 (코드 아님. 안 정하면 구현이 막힌다)
+## A. 설계 결정 — ✅ 전부 해소
 
-- [ ] **A1. 규칙에 파싱 트리를 어떻게 넘길 것인가** ⚠️ 최우선
-  - 지금 `check(model)`뿐 → XSD 규칙·규칙 ⑥이 1MB XML을 각자 재파싱 (AC5 속도와 충돌)
-  - **F7이 요구를 키웠다**: 규칙 ⑥-a는 **정규화 전 원본 트리**, L-A는 **정규화 후 사본**.
-    규칙마다 다른 버전의 트리가 필요하다 → "트리 하나 넘기기"로는 부족
-  - 선택지: `WorkbookModel`에 둘 다 보유 / `ValidationContext{raw_tree, normalized_tree, model}`
-  - 산출물: `docs/03-design.md` D3.5 개정 + `models.py`/`rule.py` 수정
-  - 근거: `docs/05-xsd-spike.md` F7 함의 2, `docs/04-scaffolding.md` "남은 미결"
+- [x] **A1. 규칙에 파싱 트리를 어떻게 넘길 것인가**
+  - 결정: `check(model)` → **`check(ctx)`**. `ValidationContext`가 모델 + `raw_tree`(정규화 전)
+    + `normalized_tree()`(정규화 후, 캐시)를 함께 든다. 파싱은 `inspect.load_context()`에서 1회
+  - 산출: `src/twb_lint/validation/context.py` · `docs/03-design.md` D3.5 · 계약 테스트
+- [x] **A2. 입력 오류(파일 없음·손상 ZIP)의 처리 주체**
+  - 결정: **엔진**. `Stage.INPUT` · `rule_id="input.readable"`로 나가되 규칙 파일은 없다.
+    규칙에 맡기면 "컨텍스트를 못 만들어 실패한 상황을 컨텍스트 받는 규칙이 판정"하는 순환
+  - 입력에서 멈추면 나머지 규칙 전부를 `SKIPPED`로 기록한다 (침묵 = 통과로 읽힘)
+  - 산출: `engine.validate` · `docs/03-design.md` D3.0 · stub 테스트 교체 완료
+- [x] **A3. L-A 위반의 심각도 정책**
+  - 실측이 판을 바꿨다 — **거짓양성(`explain-data`)과 진짜 오류(R4)가 같은 오류코드**
+    (`SCHEMAV_ELEMENT_CONTENT`)를 쓴다. 코드만으로는 못 가른다
+  - 결정: 열거형·데이터타입 위반 → ERROR · `not expected` → ERROR ·
+    `Missing child element` → WARNING · 미분류 → WARNING. **검증한 릴리스에서만** ERROR
+  - 산출: `syntactic/xsd.py` `severity_for()` · `docs/03-design.md` D3
+- [x] **A4. "검사 안 함"을 리포트가 표현할 방법**
+  - 결정: `ValidationReport.coverage: tuple[CoverageNote, ...]` (`ran`/`partial`/`skipped`).
+    `passed` = "검사한 범위에서 ERROR 없음", `fully_covered` = "전부 검사했음"
+  - 산출: `models.py` · `context.note_skip()/note_partial()` · `docs/03-design.md` D3 출력
+- [x] **A5. `Finding`에 라인 번호 추가**
+  - 결정: `line: int | None`. 정렬 키 = `rule_id → line → location`. 줄번호 없는 finding은 앞
+  - 산출: `models.py` `Finding.sort_key` · `engine.py` · 회귀 테스트 2건
+- [x] **A6. calc을 어디서 걷을 것인가** — 표본 9개 전수 실측
+  - 수식 표면 **2곳**: `<calculation@formula>` 4,757회 + **`<groupfilter@expression>`** 3회
+  - `groupfilter@expression`이 `//` 주석 · XML 엔티티 · 개행을 **전부** 담고 있었다
+  - 직접 참조 표면 7곳 (`column-instance@column`·`format@field`·`filter@column` 등)
+  - ⚠️ **표기가 2종이다** — calc 안 `[Calculation_1234]` vs 속성 `[ds].[usr:…:qk]`.
+    정규화 없이 대조하면 규칙 ②가 전량 dangling을 뱉는다. `[:Measure Names]` 1,294회
+  - 산출: `docs/03-design.md` **D3.6** · `docs/07` G8
+- [x] **A7. 신뢰 못 할 입력 방어 정책**
+  - 결정: `io/safety.py`에 파서 팩토리 + 상한. XXE·엔티티 폭탄·zip slip·zip bomb
+  - **파서는 `safety.make_parser()`로만** 만든다 (기본 파서는 엔티티를 해석한다)
+  - 상한은 실측 대비 수십 배 — 정상 파일을 막는 방어는 그 자체로 AC7 위반
+  - 산출: `io/safety.py` · `docs/03-design.md` **D9** · 실제 페이로드 테스트
+- [x] **A8. 규칙 ⑥의 version 상호작용 (기록만)**
+  - 산출: `docs/01-problem-definition.md` **§9.2**. MVP(read-only)엔 무해, C4 편집기에서 터진다
 
-- [ ] **A2. 입력 오류(파일 없음·손상 ZIP)의 처리 주체**
-  - 02 S5는 "예외 대신 ERROR finding"을 요구하는데 소유자가 없다. 모델 생성 **전** 단계라 규칙이 못 맡음
-  - 선택지: engine 직접 / `Stage.INPUT` 신설
-  - 딸린 것: `tests/unit/test_smoke.py`의 `@pytest.mark.stub` 테스트를 교체
+## B. 데이터·전제 확보
 
-- [ ] **A3. L-A(XSD) 위반의 심각도 정책**
-  - `explain-data`가 이미 "XSD가 실제 Tableau보다 엄격"의 실증. 표본 9개로 못 걸린 과엄격이
-    더 있으면 전부 ERROR로 낼 때 **AC7(거짓양성 0)이 무너진다**
-  - 정할 것: 검증된 릴리스만 ERROR? 위반 유형(missing child / enum / sequence)별 등급?
-  - 근거: `docs/05-xsd-spike.md` F3, `docs/02-specification.md` S1-6
-
-- [ ] **A4. "검사 안 함"을 리포트가 표현할 방법**
-  - 지금 `ValidationReport`는 findings + passed뿐. 아래가 전부 "통과"로 보인다:
-    미지원 릴리스로 L-A 미실행 · calc 파싱 실패로 스킵 · live DB · render 계층
-  - 소비자가 AI다. `coverage`/`skipped` 필드 필요 (02 S5 "조용히 통과 금지")
-  - `models.py` 손대는 일이므로 **A5와 함께 한 번에**
-
-- [ ] **A5. `Finding`에 라인 번호 추가**
-  - D3는 `location(xpath/line)`인데 필드는 문자열 하나. lxml `error_log`는 라인을 준다
-  - 문자열 정렬이면 `line 10 < line 9` → 정렬 키도 같이 고친다 (`engine.py` 주석 참조)
-
-- [ ] **A6. calc을 어디서 걷을 것인가 (규칙 ①② 입력 표면)**
-  - `<calculation formula>`만이 아니다 — 필터·참조선·툴팁/제목·action 표현식
-  - formula 안: XML 엔티티(`&gt;`)·개행·`//`·`/* */`·LOD `{FIXED [a]:SUM([b])}`
-  - 표면을 안 정하면 파싱 실패(=WARNING)가 폭증해 게이트가 노이즈가 된다
-  - 산출물: `calc/grammar.lark` 확장 범위 + 수집 지점 목록
-
-- [ ] **A7. 신뢰 못 할 입력 방어 정책**
-  - AI 생성 파일을 먹는 도구다: zip slip(경로 탈출), XXE, billion laughs
-  - lxml 파서 옵션(`resolve_entities=False`, `no_network=True`)과 zip 경로 정규화를
-    **io 구현 전에** 정한다
-
-- [ ] **A8. 규칙 ⑥의 version 상호작용 (기록만)**
-  - "유효 문법 = version × 매니페스트"인데 규칙은 매니페스트 누락만 본다.
-    항목을 추가하면 `version`도 올려야 하나? MVP(read-only)엔 무해, C4 편집기에서 터진다
-  - 산출물: `docs/01-problem-definition.md` §9 열린 질문에 추가
-
----
-
-## B. 데이터·전제 확보 (없으면 구현해도 안 돈다)
-
-- [ ] **B1. 공식 XSD 원본 확보**
-  - `data/schemas/`엔 README만 있다. `tools/vendor_schemas.py`가 돌 재료가 없음
-  - 정할 것: 취득 경로(레포 클론? 릴리스 파일?) · 재배포/라이선스 조건 · 오프라인 사본 유지 방식
-  - 스파이크 때 쓴 사본이 남아 있으면 정식 경로로 승격
-
-- [ ] **B2. 함수 화이트리스트 1회 스크랩**
-  - `tools/scrape_functions.py` → `data/functions/functions_2026.1.json`. 규칙 ①의 전제
-  - 네트워크 필요. HTML 구조 변경에 취약하므로 **산출 JSON을 repo에 고정**, 재스크랩은 수동
-
+- [x] **B1. 공식 XSD 원본 확보** — 정식 경로 승격 완료
+  - `tools/vendor_schemas.py` 구현: 상류(GitHub) 또는 로컬 클론 → 패치 3건 → 컴파일 검증
+  - **패치를 목록으로 코드에 둔다.** 매치 횟수까지 단언하고, 하나라도 실패하면 vendoring 실패
+  - 라이선스: **Apache-2.0** (Salesforce). 재배포 가능 — `data/schemas/NOTICE`에 표기
+  - 검증: 정상본 **9/9 통과** (우리 코드 경로 `fcp` + `safety.make_parser`로 재확인)
+- [x] **B2. 함수 화이트리스트 1회 스크랩**
+  - `tools/scrape_functions.py` → `functions_2026.1.json` **218종**, 10페이지
+  - 앵커만으로는 불완전(`WINDOW_SUM`·`RANK_DENSE` 누락) → 앵커 ∪ 본문 시그니처 − 블랙리스트
+  - 누락은 **노이즈일 뿐 게이트를 무력화하지 않는다**(규칙 ①은 WARNING 기조, S1-6)
 - [x] **B3. fcp ↔ 매니페스트 대응 스파이크** — 완료 (2026-07-29)
   - 결과: 매니페스트 항목 이름에도 fcp 접두사가 붙는다 → 10/10 완전 일치.
     규칙 ⑥-a는 **표 없이** 구조에서 도출된다. 항목 이름 22종 확보(매핑 미지 16종)
-  - 근거: `docs/05-xsd-spike.md` F7
+  - 근거: `docs/05-xsd-spike.md` F7 · 구현: `src/twb_lint/fcp.py`
+- [ ] **B4. E2E baseline 1회 실측** ⏸ **사용자 배치 대기**
+  - AC5(속도) 목표 배수를 정하려면 "Tableau 실행→렌더" 시간이 필요하다. **Tableau 실행이 필수**
+  - D 배치와 함께 진행한다 (어차피 Tableau를 여는 김에 1회 계측)
+  - 산출 예정: 측정치 1건을 `docs/03-design.md` D5에 기록
+- [x] **B5. AC3 회귀 코퍼스 발굴 판단** — 결론: **불가, 대안으로 대체**
+  - `old/generate-report`가 이 머신에 없다(경로 부재 확인). 함정 문서 원본을 열 수 없다
+  - 그러나 그 자산은 이미 `docs/06-rule-candidates.md`에 **규칙 후보로 번역돼 있다** —
+    R1~R13이 그 산물이다. 원본 없이도 주입 레시피는 성립한다
+  - 남은 한계: "모르는 실패는 정의상 못 잰다"는 문제는 그대로다. 표본 확대로만 줄어든다
 
-- [ ] **B4. E2E baseline 1회 실측**
-  - AC5(속도) 목표 배수를 정하려면 "Tableau 실행→렌더" 시간이 필요한데 현재 없다
-  - 산출물: 측정치 1건을 `docs/03-design.md` D5에 기록
+## C. 테스트 인프라 — ✅ 전부 완료
 
-- [ ] **B5. AC3 회귀 코퍼스 발굴 판단**
-  - 고장본을 우리가 아는 결함만 주입해 만들면 **모르는 실패는 정의상 못 잰다**
-  - `old/generate-report`의 실제 로드 실패 산출물·함정 이력을 코퍼스로 편입할지 결정
+- [x] **C1. 골든셋 경로 외부화**
+  - `TWB_LINT_GOLDEN_NORMAL` / `TWB_LINT_GOLDEN_BROKEN` 환경변수(`;` 구분 glob).
+    미설정 시 skip → 이 PC 밖에서도 나머지 테스트가 전부 돈다
+  - **커밋 회피 사유를 정정했다: 용량이 아니라 사내 재무 데이터 기밀이다**
+  - 산출: `tests/conftest.py` · `docs/03-design.md` D5 · `docs/07` §2
+- [x] **C2. 규칙별 단위 테스트 계층**
+  - `tests/fixtures/builder.py` — 최소 `.twb` 조각 빌더(`make_twb`/`make_ctx`).
+    실측 표기(`[ds].[usr:name:qk]`)를 그대로 낼 수 있다
+  - `tests/unit/test_rules_contract.py` — 규칙 계약 4종을 **등록된 전 규칙에 자동 적용**.
+    새 규칙을 추가하면 자동으로 검사에 태워진다
+  - `test_fcp.py`·`test_safety.py`·`test_vendored_data.py` 추가
+- [x] **C3. 정상 표본 편향 기록**
+  - 9개 중 7개가 MA_002 변형 → **실제 다양성 3종**. "9개 ERROR 0건"은 인상보다 약한 근거
+  - 산출: `docs/03-design.md` D5 · `docs/01` §9.2 · `docs/07` §2
+- [x] **C4. `.hyper` 무손실의 측정 기준**
+  - **AC8 신설** — `unpack → pack` 라운드트립 **바이트 동일성**. 등가성이 아니라 동일성
+  - 산출: `docs/02-specification.md` S4 AC8 · `docs/03` D5 · 테스트(현재 `xfail`, io 구현 시 해제)
+  - 부수 확인: 주입 스크립트가 만든 고장본 6개에서 `.hyper` **6/6 바이트 동일**
 
----
-
-## C. 테스트 인프라 (구현 1일차에 바로 필요)
-
-- [ ] **C1. 골든셋 경로 외부화**
-  - 지금 회귀 경로가 `C:\dev\JW\...` 절대경로 → 이 PC 밖에선 못 돈다
-  - 환경변수/설정으로 빼고, 파일 부재 시 skip
-  - 커밋 회피 사유에 **사내 재무 데이터 기밀**을 명시 (현 문서엔 "용량"만 적혀 있다)
-
-- [ ] **C2. 규칙별 단위 테스트 계층**
-  - smoke 5개와 골든셋(느림·로컬 종속) 사이가 비어 있다
-  - 최소 XML 조각 fixture로 규칙 하나씩. 없으면 1MB 실파일로 디버깅하게 된다
-
-- [ ] **C3. 정상 표본 편향 기록**
-  - MA_002 ×7은 같은 워크북 변형 → 실제 다양성 3종. "9개 ERROR 0건"이 실제보다 강해 보인다
-  - 산출물: `docs/03-design.md` D5의 AC7 옆에 한계 한 줄
-
-- [ ] **C4. `.hyper` 무손실의 측정 기준**
-  - 원칙(S1·G6)만 있고 AC가 없다 → unpack→pack 라운드트립 **바이트 동일성** 테스트로 고정
-
----
-
-## D. 사용자 라벨링 배치 (사람 손이 필요한 유일한 지점)
+## D. 사용자 라벨링 배치 — ⏸ **유일하게 남은 블로커**
 
 로컬 Tableau Desktop 2026.1이 **유일한 정답지**다 — 공식 검증 REST API는 Cloud 전용이라 못 쓴다(S7).
 **한 배치로 몰아서 한 번에** 진행한다 (두 번 부르지 않기).
 
+**고장본은 이미 만들어져 있다** — `tools/inject_defects.py`가 결정론적으로 생성한다.
+사용자가 할 일은 **열어 보고 결과를 적는 것뿐**이다.
+
+```bash
+# 기본 레시피 6종
+.venv/Scripts/python tools/inject_defects.py --source <원본.twbx> --out <디렉토리>
+
+# 실험 B까지 (매니페스트 항목 16종을 하나씩 삭제)
+.venv/Scripts/python tools/inject_defects.py --source <원본.twbx> --out <디렉토리> --experiment-b
+```
+
+산출 디렉토리의 `labels.json`에 `observed`·`error_text` 칸이 비어 있다. 그것을 채우면 된다.
+
 - [ ] **D1. 실험 A — 규칙 ⑥-a 인과 확정** (파일 1개)
-  - `_.fcp.DashboardRoundedCorners…` 항목만 삭제 → 열리나?
-  - 거부되면 ⑥-a를 ERROR로 승격. 열리면 fcp는 게이트가 아니라 상관일 뿐
+  - 레시피 `R1a-drop-fcp-manifest-item`. 거부되면 ⑥-a를 ERROR로 승격, 열리면 fcp는 상관일 뿐
 - [ ] **D2. 실험 B — 일반 항목 요소 매핑 캐기** (파일 ~16개)
-  - 항목을 하나씩 지운 파일 → 거부 메시지 `no declaration found for element '<요소>'`가 답을 준다
+  - 거부 메시지 `no declaration found for element '<요소>'`가 답을 준다
   - 성공 시 `data/manifest_gates.json`의 `known_items_unmapped` → `gates`로 승격
-- [ ] **D3. 기존 주입 레시피 라벨 확정** (R2·R3·R4·R7, 규칙별 ≥3케이스)
-  - 근거: `docs/06-rule-candidates.md` §D
+- [ ] **D3. 기존 주입 레시피 라벨 확정** (R1b·R2·R3·R4·R7)
+  - **R4·R7은 이미 L-A가 잡는 것이 확인됐다** — 라벨은 "실제로 안 열리는가"를 확정하는 용도
+  - **R1b·R2·R3는 L-A를 그대로 통과한다** = AC3 무거짓통과의 실증. L-B 규칙의 존재 근거
+- [ ] **D4. E2E baseline 계측** (B4와 동일 — 파일 1개를 열어 시간만 재면 된다)
 
 **보고 형식** (이것만 있으면 된다): ① 열림 ② 안 열림 + **에러 문구/코드 원문**
 (`2805CF18`, `D2E8DA72`, `no declaration found…`) ③ 열리는데 이상함 + 무엇이
 
-주입 규칙: **결함 1개씩** · **복사본에만**(원본 9개 불가침) · 배치로.
-
----
+주입 규칙: **결함 1개씩** · **복사본에만**(원본 9개 불가침) · 배치로. — 스크립트가 전부 지킨다.
 
 ## E. 후속 (구현 중/후로 미뤄도 됨)
 
 - [ ] XSD 컴파일 캐시 — MCP 상주 프로세스인데 매 호출 재컴파일하면 느리다. `xsd.py` 쓸 때 함께
-- [ ] AC2/AC5 목표 수치 확정 — 골든셋·벤치 후 (02 S6 미결)
+- [ ] AC2/AC5 목표 수치 확정 — D 배치 후 (02 S6)
 - [ ] D8 `tablangres.rcc` 역수확 — **조건부**. 실험 B가 실패하거나 커버리지가 낮을 때만
+- [ ] 표본 확대 — AC7의 신뢰도는 표본 다양성(현재 3종)에 직접 묶여 있다
 
 ---
 
@@ -141,19 +148,18 @@
 | 2026-07-28 | XSD 스파이크 | L-A 성립, 단 전처리 3단계 전제 (05 F1~F6) |
 | 2026-07-29 | 문서·코드 drift 해소 | 규칙 ⑥ 골격 · findings 정렬 · stub 테스트 표시 (04 v1.1) |
 | 2026-07-29 | B3 fcp↔매니페스트 스파이크 | 규칙 ⑥-a는 표 불필요 · 항목 22종 확보 (05 F7) |
+| 2026-07-29 | **A1~A8 설계 결정 8건** | 규칙 입력 계약 · 입력 단계 · 심각도 정책 · coverage · 줄번호 · calc 표면 · 입력 방어 (03 v1.3) |
+| 2026-07-29 | **B1·B2 데이터 확보** | vendored XSD(9/9 통과) · 함수 218종 |
+| 2026-07-29 | **C1~C4 테스트 인프라** | 3층 구조 · 골든셋 외부화 · AC8 신설 |
+| 2026-07-29 | **D 준비** | 주입 스크립트 + 라벨 대장. `.hyper` 무손실 6/6 · AC3 실증 확보 |
 
----
+## 다음 한 걸음
 
-## 권장 순서
+**구현이다.** 순서는 [`docs/07-implementation-guide.md`](./docs/07-implementation-guide.md) §4:
 
-| | 항목 | 성격 | 비용 |
-|---|---|---|---|
-| 1 | **A1** 트리 전달 (+ **A4·A5** 모델 필드 동시) | 결정 + 코드 | 반나절 |
-| 2 | **A2·A3** 입력오류 주체 · L-A 심각도 | 결정 | 문서 |
-| 3 | **D1·D2·D3** 라벨링 배치 1회 | 사람 손 | 사용자 |
-| 4 | **B1·B2** XSD 원본 · 함수 목록 | 데이터 | 네트워크 |
-| 5 | **C1·C2** 테스트 인프라 | 코드 | 반나절 |
-| 6 | **A6·A7** calc 표면 · 입력 방어 | 결정 | 문서 |
-| 7 | A8·B4·B5·C3·C4 기록/측정 | 잡 | 짧음 |
+1. `io/twbx.unpack` + `io/twb.parse` → `inspect.load_context` ← 여기가 병목
+2. `syntactic/xsd.py` (정책·vendoring 완비)
+3. `calc/extractor.py` + 규칙 ①②
+4. 규칙 ③·⑥
 
-3번(라벨링)은 사용자 일정에 묶이므로 **고장본을 미리 만들어 두고** 다른 항목과 병행한다.
+D 배치는 사용자 일정에 묶이므로 **위 1~4와 병행**한다. 고장본은 이미 준비돼 있다.

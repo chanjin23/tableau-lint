@@ -7,11 +7,12 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | ✅ 완료 |
-| 버전 | v1.1 (2026-07-29) |
+| 버전 | v1.2 (2026-07-29) |
 | 소유자 | ax3didim@gmail.com |
 | 목적 | 구현 착수 전 최대 리스크(L-A 실효성) 검증 |
 | 결과 | **XSD 노선 유효. 단 전처리 3단계가 전제.** |
 | v1.1 변경 | **F7 신설** — fcp 접두사 ↔ 매니페스트 대응 실측 (규칙 ⑥의 절반이 표 없이 풀린다) |
+| v1.2 변경 | **F8 신설** — L-A 오류의 심각도는 오류코드만으로 못 가른다 (거짓양성과 진짜 오류가 같은 코드) |
 
 ---
 
@@ -298,6 +299,35 @@ FCP = re.compile(r"^_\.fcp\.([^.]+)\.(?:true|false)\.\.\.")
 # 매니페스트: root.find(".//document-format-change-manifest") 자식 태그에서 동일 수집
 # 대조: fcp_features == {FCP 접두사 벗긴 매니페스트 항목}   → 10/10 True
 ```
+
+## F8. L-A 오류의 심각도는 오류코드만으로 못 가른다 (2026-07-29 실측)
+
+F3이 남긴 문제 — `explain-data`가 "XSD가 실제보다 엄격"의 실증이라면, **표본으로 못 걸른
+과엄격이 더 있을 때 전부 ERROR로 내면 AC7이 무너진다.** 등급표가 필요했다.
+
+lxml `error_log`의 `type_name`으로 가르려 했고, 주입 실험으로 유형별 값을 찍었다:
+
+| 주입 | `type_name` | 코드 |
+|---|---|---|
+| `param-domain-type='all'` (R7) | `SCHEMAV_CVC_ENUMERATION_VALID` | 1840 |
+| `width='abc'` | `SCHEMAV_CVC_DATATYPE_VALID_1_2_1` | 1824 |
+| 미지 요소 추가 | `SCHEMAV_ELEMENT_CONTENT` | 1871 |
+| ds 자식 순서 위반 (R4) | `SCHEMAV_ELEMENT_CONTENT` | 1871 |
+| **`explain-data` 미패치 (거짓양성)** | **`SCHEMAV_ELEMENT_CONTENT`** | **1871** |
+
+**거짓양성과 진짜 로드 거부가 같은 코드다.**
+
+```
+Element 'column': This element is not expected. ...        ← R4, 실제 로드 거부
+Element 'workbook': Missing child element(s). ...           ← explain-data, 거짓양성
+```
+
+가르는 것은 **메시지 본문**뿐이다. libxml2 메시지는 영어로 고정돼 있어 매칭이 성립한다.
+
+→ 정책: `not expected` = ERROR · `Missing child element` = WARNING · 미분류 = WARNING.
+값 위반(enum·datatype)은 코드만으로 ERROR. 상세는 [`03-design.md`](./03-design.md) D3.
+
+검증: 주입 고장본에서 R4·R7 모두 ERROR로 등급이 매겨지고, 정상본 9개는 오류 0건이다.
 
 ## 재현 방법
 

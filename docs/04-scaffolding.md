@@ -7,9 +7,10 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | ✅ 완료 (골격 + stub, 전 검사 green) |
-| 버전 | v1.1 (2026-07-28) |
-| 다음 | 구현 — L-B MVP 4규칙 + XSD + I/O 실로직 |
+| 버전 | v1.2 (2026-07-29) |
+| 다음 | 구현 — I/O 실로직 → XSD → L-B MVP 4규칙 |
 | v1.1 변경 | 스파이크 후 벌어진 drift 해소 — 규칙 ⑥ 골격 반영 · findings 정렬 구현 · stub 테스트 표시 |
+| v1.2 변경 | **남은 미결 3건 해소** + A그룹 8건 결정 · vendored XSD·함수목록 확보 · 테스트 3층 · 주입 스크립트 |
 
 ---
 
@@ -128,9 +129,37 @@ dev 툴 용도라 실질 영향은 작지만, **재현성이 필요한 검증은
 - **L-A 위반의 심각도 정책 미정.** `explain-data`가 이미 "XSD가 실제보다 엄격"의 실증 —
   전부 ERROR로 내면 AC7이 위험
 
+## v1.2 — 미결 3건 해소 + 구현 착수 준비 완료 (2026-07-29)
+
+위 3건을 포함해 [`TODO.md`](../TODO.md) A그룹 8건을 전부 정했다. **구현이 아니라 결정과
+그 결정을 못 박는 코드**만 넣었다 — 규칙 로직은 여전히 stub이다.
+
+| 미결 | 결정 | 산출 |
+|---|---|---|
+| 규칙에 트리 전달 | `check(ctx)` — 컨텍스트가 모델 + 원본 트리 + 정규화 사본을 든다 | `validation/context.py` · 03 D3.5 |
+| 입력 오류 소유자 | **엔진**. `Stage.INPUT`으로 나가되 규칙 파일은 없다 | `engine.validate` · 03 D3.0 |
+| L-A 심각도 | 오류 유형 + **메시지**까지 본다 (거짓양성과 진짜 오류가 같은 코드다) | `syntactic/xsd.py` · 03 D3 |
+| "검사 안 함" 표현 | `ValidationReport.coverage` 신설 | `models.py` · 03 D3 |
+| 줄번호 | `Finding.line: int \| None` + 정렬 키 반영 | `models.py`·`engine.py` |
+| calc 표면 | 실측 확정 — 수식 2곳 · 직접 참조 7곳 · **표기 2종** | 03 D3.6 |
+| 입력 방어 | lxml 파서 옵션·ZIP 상한을 io 구현 **전에** 고정 | `io/safety.py` · 03 D9 |
+| 규칙 ⑥ × version | 열린 질문으로 기록 | 01 §9.2 |
+
+데이터·인프라도 함께 갖췄다:
+
+- **vendored XSD** (Apache-2.0, 패치 3건 + 컴파일 검증) — 정상본 **9/9 통과 재확인**
+- **함수 화이트리스트 218종** (`tools/scrape_functions.py`)
+- **테스트 3층** — 스모크 / 규칙 계약·단위(최소 XML 빌더) / 골든셋(env 게이트)
+- **결함 주입 스크립트** — 고장본 6종 + 라벨 대장. `.hyper` 무손실 6/6 확인
+
+검사 결과: `64 passed, 1 xfailed`(골든셋 포함) · `ruff` 통과 · `mypy` 29 files 통과.
+xfail 1건은 AC8(`.hyper` 라운드트립)이며 `io` 구현과 함께 풀린다.
+
 ## 다음 (구현 단계)
 
-1. `io/twbx.py`·`io/twb.py`·`inspect.py` 실로직 (unpack/parse/모델추출).
-2. `validation/syntactic/xsd.py` — vendored XSD + lxml (`tools/vendor_schemas.py` 먼저).
-3. L-B MVP 4규칙(①②③⑥) 실로직 + `calc/extractor.py` Lark 파싱 + 함수 화이트리스트(`tools/scrape_functions.py`).
-4. 골든셋 구축 → AC2/AC3 측정.
+1. `io/twbx.py`·`io/twb.py`·`inspect.load_context` 실로직 (unpack/parse/모델추출).
+2. `validation/syntactic/xsd.py` — 스키마 로드 + 심각도 적용 (vendoring은 이미 완료).
+3. L-B MVP 4규칙(①②③⑥) 실로직 + `calc/extractor.py` Lark 파싱.
+4. 사용자 라벨링 배치 → AC2/AC3 측정.
+
+상세 순서와 함정은 [`07-implementation-guide.md`](./07-implementation-guide.md) §4 · G1~G10.

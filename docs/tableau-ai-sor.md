@@ -6,23 +6,34 @@
 
 | # | 문서 | 상태 |
 |---|---|---|
-| 01 | [문제정의 (Problem Definition)](./01-problem-definition.md) | ✅ 확정 v1.1 |
-| 02 | [스펙 (Specification)](./02-specification.md) | ✅ 확정 v1.1 |
-| 03 | [설계 (Design)](./03-design.md) | ✅ 확정 v1.1 |
-| 04 | [스캐폴딩 (Scaffolding)](./04-scaffolding.md) | ✅ 완료 v1.1 |
-| 05 | [XSD 스파이크 실측 (Spike Report)](./05-xsd-spike.md) | ✅ 완료 |
+| 01 | [문제정의 (Problem Definition)](./01-problem-definition.md) | ✅ 확정 v1.2 |
+| 02 | [스펙 (Specification)](./02-specification.md) | ✅ 확정 v1.2 |
+| 03 | [설계 (Design)](./03-design.md) | ✅ 확정 **v1.3** |
+| 04 | [스캐폴딩 (Scaffolding)](./04-scaffolding.md) | ✅ 완료 v1.2 |
+| 05 | [XSD 스파이크 실측 (Spike Report)](./05-xsd-spike.md) | ✅ 완료 v1.1 |
 | 06 | [규칙 후보 인벤토리 (Rule Candidates)](./06-rule-candidates.md) | 🔄 living |
-| 07 | [구현 가이드 (Implementation Guide)](./07-implementation-guide.md) | 🔄 living |
+| 07 | [구현 가이드 (Implementation Guide)](./07-implementation-guide.md) | 🔄 living v1.1 |
 
-**구현 착수 전에는 07을 읽는다** — G1~G7 함정, 검증 파이프라인, 관례.
+**구현 착수 전에는 07을 읽는다** — G1~G10 함정, 검증 파이프라인, 관례.
 루트 [`CLAUDE.md`](../CLAUDE.md)가 진입점이며 여기와 07을 가리킨다.
 
 ## 진행 순서
 
-① 문제정의 ✅ → ② 스펙 ✅ → ③ 설계 ✅ → ④ 스캐폴딩 ✅ → ⑤ 스파이크 ✅ → ⑥ **구현 MVP (다음)**
+① 문제정의 ✅ → ② 스펙 ✅ → ③ 설계 ✅ → ④ 스캐폴딩 ✅ → ⑤ 스파이크 ✅ →
+⑥ **착수 준비 ✅** (설계 미결·데이터·테스트) → ⑦ **구현 MVP (다음)**
 
 **05 스파이크가 01·02·03을 v1.1로 개정시켰다.** 실측이 문서를 고친 것이므로
 05·06을 근거 문서로 함께 본다 (01 §7.1·§8.1, 02 S1-6·S4 AC7·S7, 03 D0.1·D3·D3.5·D5·D8).
+
+**2026-07-29 착수 준비가 다시 문서를 고쳤다** — 설계 미결 8건을 정하면서 실측이 두 번 더
+전제를 뒤집었다:
+
+| 실측 | 뒤집은 것 | 반영 |
+|---|---|---|
+| L-A 거짓양성과 진짜 오류가 **같은 오류코드** | "XSD 위반 = ERROR"라는 암묵 전제 | 03 D3 심각도 정책 |
+| 필드 참조 **표기가 2종** (`[Calc_1]` vs `[ds].[usr:…:qk]`) | 규칙 ②를 그대로 짰으면 전량 오탐 | 03 **D3.6** · 07 G8 |
+
+전체 목록은 [`../TODO.md`](../TODO.md) 완료 로그.
 
 코드: 루트 `twb-lint` 패키지 (`src/twb_lint/`, `pyproject.toml`, `README.md`).
 
@@ -33,6 +44,6 @@
 ## 메타
 
 - 소유자: ax3didim@gmail.com
-- 최종 갱신: 2026-07-28 (01·02·03 v1.1, 05·06 신규, 04 v1.1 = 코드 drift 해소)
+- 최종 갱신: 2026-07-29 (구현 착수 준비 — 03 v1.3, 01·02·04 v1.2, 07 v1.1)
 - 변경 이력: 각 문서의 "문서 관리" 블록 참조.
 - 대상 환경 고정: **Tableau 2026.1 · 로컬 전용** (02 S7).

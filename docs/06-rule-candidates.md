@@ -206,6 +206,30 @@
 
 이 방식이면 D5의 "규칙별 고장 케이스 ≥3"을 손으로 워크북을 만들지 않고 채울 수 있다.
 
+### D.0 구현 완료 (2026-07-29) — `tools/inject_defects.py`
+
+위 6종이 결정론적 스크립트가 됐다. 원본은 읽기만 하고, `.twb` 엔트리만 교체하며
+나머지(특히 `.hyper`)는 **바이트 그대로** 복사한다 — 확인됨(6/6 동일).
+
+```bash
+python tools/inject_defects.py --source <원본.twbx> --out <디렉토리>              # 6종
+python tools/inject_defects.py --source <원본.twbx> --out <디렉토리> --experiment-b  # + 16종
+```
+
+산출물과 함께 **라벨 대장**(`labels.json`)이 나온다. `observed`·`error_text` 칸이 비어
+있으며, 사용자가 채우면 그대로 AC2·AC3 측정 입력이 된다.
+
+**첫 실행이 이미 하나를 증명했다** — 어느 계층이 잡는지가 라벨링 전에 측정된다:
+
+| 레시피 | vendored XSD(L-A) | 함의 |
+|---|---|---|
+| R4 자식 순서 | **검출** `SCHEMAV_ELEMENT_CONTENT` → ERROR | L-A 담당 확인 |
+| R7 enum | **검출** `SCHEMAV_CVC_ENUMERATION_VALID` → ERROR | L-A 담당 확인 |
+| R1-a · R1-b · R2 · R3 | **오류 0건 — 그대로 통과** | **AC3 무거짓통과의 실증** |
+
+아래 4종은 L-A를 통과하고도 Tableau가 열지 못하는 파일이다. **L-B 규칙 ③·⑥이 없으면
+게이트가 이 파일들을 승인한다** — 이 프로젝트가 존재하는 이유가 여기서 측정된다.
+
 ### D.1 주입은 라벨링만 하는 게 아니다 — 대응표를 캔다 (2026-07-29)
 
 R1-b의 미지수는 "**어느 항목이 어느 요소를 게이팅하는가**"다. 그런데 로드 거부 메시지가
