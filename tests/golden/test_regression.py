@@ -95,6 +95,46 @@ def test_inspector_extracts_a_non_empty_model_from_every_workbook(
             assert placed <= dash.viewpoints, f"{path.name}/{dash.name}: viewpoint 누락"
 
 
+def test_every_function_in_real_formulas_is_whitelisted(
+    require_golden_normal: list[Path], record_property: object
+) -> None:
+    """규칙 ①의 AC7 근거 — 실사용 수식의 함수가 218종 목록에 **전부** 있는가.
+
+    이 관계가 깨지면 규칙 ①이 정상본에서 WARNING을 뱉기 시작한다. 원인은 둘 중
+    하나다: 스캐너가 함수가 아닌 것을 함수로 세거나(03 D3.7 키워드 목록), 화이트리스트가
+    낡았거나(`tools/scrape_functions.py`). 어느 쪽인지는 아래 목록이 말해 준다.
+    """
+    import json
+
+    from twb_lint.calc.extractor import extract
+
+    functions_file = config.functions_path("2026.1")
+    assert functions_file is not None, "함수 목록이 없다 — tools/scrape_functions.py를 돌린다"
+    whitelist = set(json.loads(functions_file.read_text(encoding="utf-8"))["functions"])
+
+    parser = safety.make_parser()
+    found: set[str] = set()
+    formulas = 0
+    for path in require_golden_normal:
+        root = _load_twb_root(path, parser)
+        if root is None:
+            continue
+        for el in root.iter("calculation"):
+            if (formula := el.get("formula")) is not None:
+                formulas += 1
+                found |= extract(formula).functions
+        for el in root.iter("groupfilter"):
+            if (expression := el.get("expression")) is not None:
+                formulas += 1
+                found |= extract(expression).functions
+
+    record_property("golden_formula_count", formulas)  # type: ignore[operator]
+    assert formulas, "수식을 하나도 못 찾았다 — 수집 표면이 어긋났다 (03 D3.6)"
+    assert not (found - whitelist), (
+        f"화이트리스트에 없는 함수: {sorted(found - whitelist)}"
+    )
+
+
 def test_c4_hyper_survives_a_roundtrip_byte_for_byte(
     require_golden_normal: list[Path], tmp_path: Path
 ) -> None:

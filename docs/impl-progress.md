@@ -7,9 +7,9 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `114 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 47 source files`
-(골든셋 미설정 시 `104 passed, 10 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `125 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 48 source files`
+(골든셋 미설정 시 `114 passed, 11 skipped`)
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -43,8 +43,9 @@
 
 ## 3. calc ← 다음
 
-- [ ] **3a. `calc/extractor.py`** — 수집 표면 2곳: `<calculation@formula>` ·
-      `<groupfilter@expression>`. 후자가 `//` 주석 · XML 엔티티 · 개행을 전부 담는다
+- [x] **3a. `calc/extractor.py`** — **Lark 문법 대신 어휘 스캐너**로 뒤집었다 (03 D3.7).
+      실측: 수식 5,270건 · 함수 26종 · 화이트리스트 미매칭 **0건** · 파싱 실패 구조상 불가.
+      `lark` 의존과 `grammar.lark`를 제거했다. 골든 회귀가 이 관계를 고정한다
 - [ ] **3b. 표기 정규화** (G8) — calc 안 `[Calculation_1234]` ↔ 속성 `[ds].[usr:name:qk]`.
       **여기가 규칙 ②의 최대 함정이다**
 - [ ] **3c. 규칙 ①** 함수 화이트리스트 218종 대조 (WARNING 기조 — 목록 불완전이 전제)
@@ -75,3 +76,4 @@
 | 3 | 1c `load_context` 모델 실채움 | 102 passed, 1 xfailed | 0 | 골든셋 10개 추출 실측: ds 2~5 · 필드 73~240 · calc 56~111 · ws=win=zone=vp 전부 일치. **픽스처 결함 2건**(`<datasources>` 래퍼 누락 · 시트 존에 `type-v2`)을 실측 기준으로 교정 |
 | 4 | 1d `twbx.pack` | **108 passed** (xfail 0) | 0 | **AC8 뒤집힘 — io 1단계 완료.** CLAUDE.md·07의 게이트 수치도 갱신 |
 | 5 | 2a~2c L-A 배선 | 114 passed | **0** | 정상본 10/10 ERROR 0·WARNING 0. R4·R7이 게이트를 막는다. 54ms/file(스키마 컴파일 포함). stub 테스트 `test_ac2_...`를 검출 단언 + AC3 실측으로 분리 |
+| 6 | 3a calc 추출기 | 125 passed | 0 | **설계 뒤집기**: Lark 문법 → 어휘 스캐너 (03 v1.5 D3.7). 근거는 실측 5,270 수식/미매칭 0. `lark` 의존 제거 |

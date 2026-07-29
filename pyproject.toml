@@ -8,7 +8,6 @@ license = { text = "MIT" }
 dependencies = [
     "mcp[cli]>=1.2",
     "lxml>=5.0",
-    "lark>=1.1",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +45,7 @@ files = ["src", "tests", "tools"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["lark.*", "lxml.*", "mcp.*", "tableauhyperapi.*", "tableaudocumentapi.*"]
+module = ["lxml.*", "mcp.*", "tableauhyperapi.*", "tableaudocumentapi.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
