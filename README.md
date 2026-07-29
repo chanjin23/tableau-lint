@@ -18,25 +18,40 @@ twb-lint = 공식 XSD(A) 위에 **(B) 시맨틱 검증기**를 얹은 것.
 
 ## 상태
 
-**구현 착수 준비 완료** — 골격 + stub. 설계 미결·데이터·테스트 인프라는 갖췄고,
-실제 검증 로직은 구현 단계에서 채운다.
+**MVP 규칙 5종 가동.** io · L-A(XSD) · L-B 규칙 ①②③⑥이 실로직이다.
 
 | | 상태 |
 |---|---|
-| 설계 결정 | ✅ 8건 해소 (규칙 입력 계약 · 심각도 정책 · calc 표면 · 입력 방어 …) |
-| vendored XSD | ✅ 패치 3건 + 컴파일 검증. 정상본 **9/9 통과** |
-| 함수 화이트리스트 | ✅ 218종 |
-| 테스트 | ✅ 3층 (스모크 / 규칙 계약·단위 / 골든셋) — 74 passed |
-| 고장본 골든셋 | ✅ 주입 스크립트로 생성 가능. 라벨 확정은 사용자 배치 대기 |
-| 규칙 로직 | ⏳ stub |
+| io (unpack·parse·모델 추출·pack) | ✅ `.hyper` 라운드트립 바이트 동일성(AC8) 통과 |
+| L-A 구문 (vendored XSD) | ✅ 컴파일 캐시 + 심각도 등급. 정상본 10/10 통과 |
+| L-B 규칙 ①②③⑥ | ✅ 전부 가동 |
+| 테스트 | ✅ 3층 (스모크 / 규칙 계약·단위 / 골든셋) — **170 passed** |
+| 라벨 확정 | ⏸ 사용자 배치 대기 (Tableau Desktop 필요 — `TODO.md` D) |
+
+**게이트가 실제로 무엇을 막는가** (결함 주입 6종, 정상본 10개 기준):
+
+| 주입 결함 | 판정 | 막은 계층 |
+|---|---|---|
+| `R4` 자식 순서 위반 · `R7` 잘못된 열거값 | ERROR | L-A (XSD) |
+| `R2` viewpoint 누락 · `R3` dangling zone | ERROR | 규칙 ③ |
+| `R1b` 매니페스트 항목 누락 | ERROR | 규칙 ⑥-b |
+| `R1a` fcp 매니페스트 항목 누락 | WARNING **(의도)** | 규칙 ⑥-a — 인과 미검증 |
+
+정상본 10개는 **ERROR 0건**(AC7). WARNING 24건은 전부 규칙 ②가 잡은 실제 잔재 참조다 —
+삭제된 계산필드를 가리키는 서식 규칙이 남아 있어도 Tableau는 그 파일을 연다.
 
 대상 환경: **Tableau 2026.1 · 로컬 전용** (`docs/02-specification.md` S7).
 
-MVP 검증 규칙 (고가치 4):
-1. `calc.functions` — calc 내 미지원/환각 함수 (함수 화이트리스트) — **WARNING 기조**
-2. `calc.field_refs` — calc 필드 참조 dangling 해소
-3. `named.refs` — worksheet↔dashboard↔window 참조 무결성 (viewpoint 누락 = 내부 오류 2805CF18)
-4. `manifest.gates` — 기능↔`document-format-change-manifest` 일관성. **XSD가 못 잡는 로드 거부 클래스**
+MVP 검증 규칙 (고가치 4) — **심각도는 실측이 정했다**:
+
+| 규칙 | 심각도 | 근거 |
+|---|---|---|
+| `calc.functions` 미지원/환각 함수 | WARNING | 목록이 스크랩본이라 불완전할 수 있다 |
+| `calc.field_refs` dangling 참조 | WARNING | **정상 파일에도 잔재 참조가 있다**(실측) |
+| `named.refs` worksheet↔dashboard↔window | **ERROR** | 표본 10/10에서 세 집합이 일치. viewpoint 누락 = 내부 오류 2805CF18 |
+| `manifest.gates` 기능↔매니페스트 | ERROR / WARNING | 대응표 쌍은 로드 거부 실측 → ERROR. fcp 계열은 인과 미검증 → WARNING |
+
+`manifest.gates`와 `named.refs`가 **XSD가 원리적으로 못 잡는** 로드 거부 클래스다.
 
 2차: `meta.hyper`(메타↔hyper 대조, `[hyper]` extra), `connection.attrs`.
 
