@@ -49,6 +49,25 @@ _DECORATED = re.compile(r"^(?P<role>[a-z]{1,8}):(?P<inner>.+):(?P<kind>[a-z]{2})
 꼬리의 `:숫자`는 같은 필드를 여러 번 올렸을 때 붙는 인스턴스 번호다
 (`usr:Calculation_1476…:qk:3` — 실측). 이름의 일부가 아니다."""
 
+REFERENCE_SURFACES = (
+    ("column-instance", "column"),
+    ("column-instance", "name"),
+    ("format", "field"),
+    ("text", "column"),
+    ("groupfilter", "member"),
+    ("filter", "column"),
+    ("encoding", "field"),
+    ("computed-sort", "using"),
+    ("lod", "column"),
+)
+"""필드를 **직접** 참조하는 요소·속성 (03 D3.6 실측 + 추가 확인분).
+
+`column@name`은 여기 없다 — 그것은 참조가 아니라 **정의**다. 넣으면 규칙 ②가
+자기 정의를 근거로 항상 통과한다.
+
+목록 밖 속성은 검사하지 않는다. 추측해서 참조로 읽으면 그 자리가 통째로
+거짓 dangling이 된다 (02 S1-6)."""
+
 SPECIAL_PREFIX = ":"
 """`[:Measure Names]`·`[:Measure Values]` — 필드가 아니라 Tableau 내장 축이다."""
 

@@ -7,9 +7,9 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `144 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 51 source files`
-(골든셋 미설정 시 `133 passed, 11 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `153 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 52 source files`
+(골든셋 미설정 시 `142 passed, 11 skipped`)
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -41,7 +41,7 @@
       `Finding(line=e.line, location=e.path)`. 상한 200건 + 초과 시 `note_partial`
 - [x] **2c.** 정상본 10/10 **ERROR 0 · WARNING 0** · 주입본 R4·R7이 게이트를 막는다(실측)
 
-## 3. calc ← 다음
+## 3. calc ✅ 완료
 
 - [x] **3a. `calc/extractor.py`** — **Lark 문법 대신 어휘 스캐너**로 뒤집었다 (03 D3.7).
       실측: 수식 5,270건 · 함수 26종 · 화이트리스트 미매칭 **0건** · 파싱 실패 구조상 불가.
@@ -59,10 +59,11 @@
 - [x] **3c. 규칙 ①** 함수 화이트리스트 대조. **WARNING 고정** · 함수 이름별 1건
       (첫 자리 + 수식 개수). 수식 표면 2곳을 `extractor.formulas_in()`으로 공유해
       규칙 ②와 커버리지가 어긋나지 않게 했다. 골든셋 10개 WARNING **0건**
-- [ ] **3d. 규칙 ②** 필드 참조 — 특수 네임스페이스 예외 필수
-      (`[:Measure Names]` 1,294회 · `[Parameters].[…]` · 집합/그룹/bin/계층)
+- [x] **3d. 규칙 ②** 필드 참조. 표면 = 수식 2곳 + `fieldref.REFERENCE_SURFACES` 9곳.
+      특수 네임스페이스 3종 제외 · 이름별 1건(참조 개수 포함) · **WARNING 고정**.
+      골든셋 10개 실측: ERROR 0 · **WARNING 24건**(파일당 1~6, 전부 실제 잔재 참조)
 
-## 4. 나머지 규칙
+## 4. 나머지 규칙 ← 다음
 
 - [ ] **4a. 규칙 ③** 참조 무결성 3자 대조 (worksheet · dashboard · window)
 - [ ] **4b. 규칙 ⑥** — ⑥-a fcp(`ctx.raw_tree` 필수, `fcp.py`가 이미 다 준다) ·
@@ -90,3 +91,4 @@
 | 7 | 3b-1 표기 정규화 | 134 passed | 0 | `fieldref.py` 신설(03 v1.6 D3.6.1). 참조 16,754건 실측 → 미해소 687건은 **모델 필드 유니버스의 공백**임을 확인, 3b-2로 분리 |
 | 8 | 3b-2·3b-3 필드 유니버스 + 규칙 ② 심각도 | 138 passed | 0 | 미해소 687→94. **남은 94건이 정상 파일의 실제 잔재 참조**임을 확인 → 규칙 ②를 ERROR→WARNING 하향 (03 v1.7 D3.6.3) |
 | 9 | 3c 규칙 ① | 144 passed | **0** | 골든셋 10개에서 finding 0건(ERROR·WARNING 모두). stub 목록에서 `calc.functions` 제거 |
+| 10 | 3d 규칙 ② | 153 passed | **24** | 골든셋 ERROR 0 · WARNING 24(파일당 1~6). 전부 실제 잔재 참조이며 D3.6.3 예측과 일치. 3단계 완료 |
