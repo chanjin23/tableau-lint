@@ -50,11 +50,12 @@ def load_context(
     problems: list[safety.InputProblem] = []
 
     if source.suffix.lower() == ".twbx":
-        # 구현 단계에서 실제 unpack (io/safety의 zip slip·zip bomb 정책 적용).
         try:
             unpacked = twbx.unpack(source, workdir)
             twb_path: Path | None = unpacked.twb_path
-        except NotImplementedError:
+        except twbx.ArchiveError as exc:
+            # 예외를 여기서 멈춘다 — 검증 경로는 예외가 아니라 finding으로 말한다 (02 S5).
+            problems.append(exc.problem)
             twb_path = None
     else:
         twb_path = source

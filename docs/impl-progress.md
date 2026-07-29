@@ -17,8 +17,10 @@ xfail 1건 = AC8(`.hyper` 라운드트립 바이트 동일성). **1단계 완료
 
 ## 1. io 실로직 ← 병목
 
-- [ ] **1a. `io/twbx.unpack`** — zip slip(`safe_extract_path`) · zip bomb(`check_zip_entry`)
-      정책 통과. `.hyper`는 바이트 그대로
+- [x] **1a. `io/twbx.unpack`** — zip slip(`safe_extract_path`) · zip bomb(`check_zip_entry`)
+      정책 통과. `.hyper`는 바이트 그대로.
+      오류 전달은 `ArchiveError`(`InputProblem` 운반) — 계약은 [`03-design.md`](./03-design.md) D9.1.
+      `load_context`가 잡아 문제 목록으로 바꾼다(엔진 경계에서 02 S5 유지)
 - [ ] **1b. `io/twb.parse` / `read_version` / `serialize`** — 파서는 `safety.make_parser()`만
 - [ ] **1c. `inspect.load_context`** — `raw_tree` + `source_build`·`twb_version`·
       `manifest_features`·`datasources`·`worksheets` 채움.
@@ -62,3 +64,4 @@ xfail 1건 = AC8(`.hyper` 라운드트립 바이트 동일성). **1단계 완료
 | # | 단위 | 게이트 | WARNING수 | 비고 |
 |---|---|---|---|---|
 | 0 | 대장 생성 | 74 passed, 1 xfailed | — | baseline 실측 확인 |
+| 1 | 1a `twbx.unpack` | 84 passed, 1 xfailed | 0 | 골든셋 10개 실해제 확인(각 <0.01s, 4엔트리). AC8은 `pack` 미구현이라 xfail 유지 |
