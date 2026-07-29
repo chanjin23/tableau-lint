@@ -16,7 +16,8 @@ dangling 참조를 ERROR로 flag.
 
 from __future__ import annotations
 
-from twb_lint.models import Finding, WorkbookModel
+from twb_lint.models import Finding
+from twb_lint.validation.context import ValidationContext
 from twb_lint.validation.registry import register
 from twb_lint.validation.rule import RuleBase, Stage
 
@@ -26,5 +27,10 @@ class CalcFieldRefsRule(RuleBase):
     id = "calc.field_refs"
     stage = Stage.SEMANTIC
 
-    def check(self, model: WorkbookModel) -> list[Finding]:  # noqa: ARG002
+    def check(self, ctx: ValidationContext) -> list[Finding]:
+        # 구현: 수식 표면(calculation@formula · groupfilter@expression)과
+        #       직접 참조 표면(column-instance@column · format@field · filter@column …)을
+        #       각각 걷어 `calc.refs.normalize_field_ref()`로 정규화 후 대조.
+        #       두 표면은 표기가 다르다 — docs/03-design.md D3.6.
+        ctx.note_skip(self.id, "규칙 미구현 (스캐폴딩)")
         return []

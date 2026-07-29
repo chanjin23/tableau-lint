@@ -31,9 +31,10 @@ class Finding:
     Attributes:
         severity: 심각도.
         rule_id: 규칙 식별자 (예: "calc.functions").
-        location: 위치 (xpath, 라인, 필드명 등 사람이 짚을 수 있는 표시).
+        location: 위치 (xpath, 필드명 등 사람이 짚을 수 있는 표시).
         message: 무엇이 잘못됐는지.
         fix: 제안 수정 (없으면 None).
+        line: `.twb` 안 1-기반 줄번호. 모르면 None.
     """
 
     severity: Severity
@@ -42,6 +43,55 @@ class Finding:
     message: str
     fix: str | None = None
 
+    line: int | None = None
+    """줄번호를 **문자열이 아니라 정수로** 갖는다. lxml `error_log`가 `error.line`을 주므로
+    L-A는 항상 채울 수 있다. 문자열이면 정렬에서 `line 10 < line 9`가 되어 결정론적이지만
+    사람이 읽기엔 틀린 순서가 나온다 (docs/03-design.md D3 정렬 규칙)."""
+
+    @property
+    def sort_key(self) -> tuple[str, int, str]:
+        """엔진이 findings를 정렬할 때 쓰는 키 (단계 안에서).
+
+        `rule_id → line → location` 순. 줄번호를 모르는 finding(`None`)은 `-1`로 앞에 모인다 —
+        L-B 규칙 대부분은 모델 대조라 줄번호가 없고, 줄번호가 있는 L-A 결과와 섞이면
+        읽는 순서가 흔들리기 때문이다.
+        """
+        return (self.rule_id, self.line if self.line is not None else -1, self.location)
+
+
+class CoverageStatus(StrEnum):
+    """규칙이 실제로 무엇을 했는지. "조용히 통과" 금지의 실체 (02 S5).
+
+    findings가 비었다는 사실만으로는 "검사했고 문제없음"과 "검사하지 못했음"을
+    구분할 수 없다. 소비자가 AI이므로 이 차이를 명시적으로 넘긴다.
+    """
+
+    RAN = "ran"
+    """대상 전체를 검사했다."""
+
+    PARTIAL = "partial"
+    """일부만 검사했다 (예: calc 3개 중 1개가 파싱 실패해 그 calc만 스킵)."""
+
+    SKIPPED = "skipped"
+    """아예 검사하지 못했다 (예: 미지원 릴리스라 L-A 미실행)."""
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageNote:
+    """규칙 하나의 검사 범위 보고.
+
+    엔진이 실행한 모든 규칙에 대해 최소 1건을 보장한다 — 규칙이 아무 말도 하지 않으면
+    `RAN`으로 기록된다. 규칙이 스스로 `ctx.note_skip()`을 부르면 그것이 우선한다.
+    """
+
+    rule_id: str
+    status: CoverageStatus
+    scope: str = "*"
+    """무엇에 대한 보고인지. 파일 전체면 `"*"`, 부분이면 해당 대상(calc 이름 등)."""
+
+    reason: str | None = None
+    """왜 스킵/부분인지. `SKIPPED`·`PARTIAL`이면 필수적으로 채운다."""
+
 
 @dataclass(frozen=True, slots=True)
 class ValidationReport:
@@ -49,14 +99,36 @@ class ValidationReport:
 
     findings: tuple[Finding, ...] = ()
 
+    coverage: tuple[CoverageNote, ...] = ()
+    """무엇을 검사했고 무엇을 못 했는지 (02 S5 "조용히 통과 금지").
+
+    `findings`가 비어 있고 `passed`가 True여도 여기 `SKIPPED`가 있으면
+    **검사되지 않은 영역이 있다**는 뜻이다. 호출자는 이 값을 보고 판단해야 한다."""
+
     @property
     def passed(self) -> bool:
-        """ERROR 심각도 finding이 하나도 없으면 통과."""
+        """ERROR 심각도 finding이 하나도 없으면 통과.
+
+        주의: 통과 = "검사한 범위에서 문제없음"이지 "전부 검사했음"이 아니다.
+        검사 범위는 `coverage`/`skipped`가 말한다.
+        """
         return not any(f.severity is Severity.ERROR for f in self.findings)
 
     @property
     def errors(self) -> tuple[Finding, ...]:
         return tuple(f for f in self.findings if f.severity is Severity.ERROR)
+
+    @property
+    def skipped(self) -> tuple[CoverageNote, ...]:
+        """검사하지 못했거나 일부만 검사한 항목."""
+        return tuple(
+            c for c in self.coverage if c.status is not CoverageStatus.RAN
+        )
+
+    @property
+    def fully_covered(self) -> bool:
+        """모든 규칙이 대상 전체를 검사했는가. False면 `passed`를 액면대로 믿으면 안 된다."""
+        return not self.skipped
 
 
 @dataclass(frozen=True, slots=True)
