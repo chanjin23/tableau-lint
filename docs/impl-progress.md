@@ -7,9 +7,9 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `125 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 48 source files`
-(골든셋 미설정 시 `114 passed, 11 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `134 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 50 source files`
+(골든셋 미설정 시 `123 passed, 11 skipped`)
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -46,8 +46,17 @@
 - [x] **3a. `calc/extractor.py`** — **Lark 문법 대신 어휘 스캐너**로 뒤집었다 (03 D3.7).
       실측: 수식 5,270건 · 함수 26종 · 화이트리스트 미매칭 **0건** · 파싱 실패 구조상 불가.
       `lark` 의존과 `grammar.lark`를 제거했다. 골든 회귀가 이 관계를 고정한다
-- [ ] **3b. 표기 정규화** (G8) — calc 안 `[Calculation_1234]` ↔ 속성 `[ds].[usr:name:qk]`.
-      **여기가 규칙 ②의 최대 함정이다**
+- [x] **3b-1. 표기 정규화** (G8) — `twb_lint/fieldref.py`. 계약은 03 D3.6.1.
+      `]]`가 `]`의 이스케이프임을 실측으로 발견해 추출기·정규화기·인스펙터 **세 곳**의
+      대괄호 패턴을 맞췄다
+- [ ] **3b-2. 필드 유니버스 보강** ← 규칙 ② 착수 전 필수.
+      실측(표본 10개, 참조 16,754건): 해소 15,339 · 특수 728 · **미해소 687**.
+      미해소가 전부 모델의 공백이다 — 규칙 ②를 지금 구현하면 정상본에서 687건이 터진다:
+      1. **일반 DB 컬럼** (`[scrn_seq]`·`[기준년월]`) — `<column>` 요소가 없다.
+         커스터마이즈된 필드만 `<column>`으로 적히고 나머지는 `<metadata-records>`/`<cols>`에 있다
+      2. **그룹·집합·bin·계층** (`[C_LV1_KEY 계산]`) — `<group name=…>` 등 별도 요소
+      3. **워크시트 지역 정의** — `datasource-dependencies` 안에만 있는 calc
+      4. **Parameters 누락분** (`[Parameters].[매개 변수 6]`)
 - [ ] **3c. 규칙 ①** 함수 화이트리스트 218종 대조 (WARNING 기조 — 목록 불완전이 전제)
 - [ ] **3d. 규칙 ②** 필드 참조 — 특수 네임스페이스 예외 필수
       (`[:Measure Names]` 1,294회 · `[Parameters].[…]` · 집합/그룹/bin/계층)
@@ -77,3 +86,4 @@
 | 4 | 1d `twbx.pack` | **108 passed** (xfail 0) | 0 | **AC8 뒤집힘 — io 1단계 완료.** CLAUDE.md·07의 게이트 수치도 갱신 |
 | 5 | 2a~2c L-A 배선 | 114 passed | **0** | 정상본 10/10 ERROR 0·WARNING 0. R4·R7이 게이트를 막는다. 54ms/file(스키마 컴파일 포함). stub 테스트 `test_ac2_...`를 검출 단언 + AC3 실측으로 분리 |
 | 6 | 3a calc 추출기 | 125 passed | 0 | **설계 뒤집기**: Lark 문법 → 어휘 스캐너 (03 v1.5 D3.7). 근거는 실측 5,270 수식/미매칭 0. `lark` 의존 제거 |
+| 7 | 3b-1 표기 정규화 | 134 passed | 0 | `fieldref.py` 신설(03 v1.6 D3.6.1). 참조 16,754건 실측 → 미해소 687건은 **모델 필드 유니버스의 공백**임을 확인, 3b-2로 분리 |

@@ -26,7 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from twb_lint import fcp
+from twb_lint import fcp, fieldref
 from twb_lint.io import safety, twb, twbx
 from twb_lint.models import Dashboard, DataSource, FieldDef, WorkbookModel
 from twb_lint.validation.context import ValidationContext
@@ -178,9 +178,12 @@ def _unbracket(name: str | None) -> str | None:
 
     `column@name`은 대괄호가 붙은 채로 저장된다. `qualified_field_names()`가
     `[ds].[field]`를 조립하므로 여기서 벗겨 두지 않으면 `[[field]]`가 된다.
+
+    안쪽의 `]]`도 되돌린다 — `]`의 이스케이프다. 벗기지 않으면 참조 쪽
+    (`fieldref.parse`)과 표기가 어긋나 그 필드가 통째로 dangling이 된다.
     """
     if name is None:
         return None
     if len(name) >= 2 and name.startswith("[") and name.endswith("]"):
-        return name[1:-1]
+        return fieldref.unescape(name[1:-1])
     return name
