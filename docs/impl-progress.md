@@ -7,9 +7,9 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `138 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 50 source files`
-(골든셋 미설정 시 `127 passed, 11 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `144 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 51 source files`
+(골든셋 미설정 시 `133 passed, 11 skipped`)
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -56,7 +56,9 @@
       실제 잔재 참조**였다(삭제된 계산필드를 가리키는 `format@field` 규칙 등, 파일은 정상 열림).
       **규칙 ②를 ERROR로 두면 정상 골든셋 10/10이 막힌다** → WARNING으로 하향.
       ERROR 승격은 라벨링 배치(D1~D4) 이후, dangling 0인 표면 4종부터
-- [ ] **3c. 규칙 ①** 함수 화이트리스트 218종 대조 (WARNING 기조 — 목록 불완전이 전제)
+- [x] **3c. 규칙 ①** 함수 화이트리스트 대조. **WARNING 고정** · 함수 이름별 1건
+      (첫 자리 + 수식 개수). 수식 표면 2곳을 `extractor.formulas_in()`으로 공유해
+      규칙 ②와 커버리지가 어긋나지 않게 했다. 골든셋 10개 WARNING **0건**
 - [ ] **3d. 규칙 ②** 필드 참조 — 특수 네임스페이스 예외 필수
       (`[:Measure Names]` 1,294회 · `[Parameters].[…]` · 집합/그룹/bin/계층)
 
@@ -87,3 +89,4 @@
 | 6 | 3a calc 추출기 | 125 passed | 0 | **설계 뒤집기**: Lark 문법 → 어휘 스캐너 (03 v1.5 D3.7). 근거는 실측 5,270 수식/미매칭 0. `lark` 의존 제거 |
 | 7 | 3b-1 표기 정규화 | 134 passed | 0 | `fieldref.py` 신설(03 v1.6 D3.6.1). 참조 16,754건 실측 → 미해소 687건은 **모델 필드 유니버스의 공백**임을 확인, 3b-2로 분리 |
 | 8 | 3b-2·3b-3 필드 유니버스 + 규칙 ② 심각도 | 138 passed | 0 | 미해소 687→94. **남은 94건이 정상 파일의 실제 잔재 참조**임을 확인 → 규칙 ②를 ERROR→WARNING 하향 (03 v1.7 D3.6.3) |
+| 9 | 3c 규칙 ① | 144 passed | **0** | 골든셋 10개에서 finding 0건(ERROR·WARNING 모두). stub 목록에서 `calc.functions` 제거 |

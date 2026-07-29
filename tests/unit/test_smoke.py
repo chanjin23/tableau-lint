@@ -197,12 +197,7 @@ def test_stub_rules_report_themselves_as_unimplemented(tmp_path: Path) -> None:
 
     report = engine.validate(twb)
     unimplemented = {c.rule_id for c in report.skipped if c.reason == "규칙 미구현 (스캐폴딩)"}
-    assert unimplemented == {
-        "calc.field_refs",
-        "calc.functions",
-        "manifest.gates",
-        "named.refs",
-    }
+    assert unimplemented == {"calc.field_refs", "manifest.gates", "named.refs"}
 
     # xsd.schema만 **입력이 없어서** 스킵된다 — 미구현과 구분되는 별개의 사유다.
     reasons = {c.rule_id: (c.reason or "") for c in report.skipped}

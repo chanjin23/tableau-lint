@@ -19,7 +19,15 @@ XML 엔티티(`&apos;`·`&#13;&#10;`)는 여기 오기 전에 풀린다 — lxml
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
+
+FORMULA_SURFACES = (("calculation", "formula"), ("groupfilter", "expression"))
+"""수식이 들어 있는 요소·속성 (03 D3.6 실측, 표본 9개 4,757 + 3회).
+
+**데이터로 갖는다.** 목록 밖 요소는 침묵한다 — 표본에 `<reference-line>`이 없었다고
+"안 나온다"는 뜻은 아니지만, 추측해서 검사하지는 않는다."""
 
 _TOKEN = re.compile(
     # 순서가 곧 우선순위다. 주석·문자열을 **먼저** 먹어야 그 안의 `[...]`나 함수처럼
@@ -73,6 +81,19 @@ class CalcRefs:
 
     **정규화하지 않는다** — 워크시트 속성 표기(`[ds].[usr:name:qk]`)와 맞추는 일은
     규칙 ②의 몫이고, 여기서 미리 벗기면 어느 쪽 표기였는지가 사라진다 (07 G8)."""
+
+
+def formulas_in(root: Any) -> Iterator[tuple[Any, str]]:
+    """트리에서 수식을 전부 걷는다 — `(요소, 수식)`.
+
+    규칙 ①②가 **같은 표면**을 봐야 한다. 한쪽만 `groupfilter@expression`을 빠뜨리면
+    두 규칙의 커버리지가 조용히 달라진다.
+    """
+    for tag, attr in FORMULA_SURFACES:
+        for el in root.iter(tag):
+            value = el.get(attr)
+            if value:
+                yield el, value
 
 
 def extract(formula: str) -> CalcRefs:
