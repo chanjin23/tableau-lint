@@ -15,11 +15,22 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+from typing import Any
+
 from twb_lint import config
+from twb_lint.io import safety
 from twb_lint.models import Finding, Severity
 from twb_lint.validation.context import ValidationContext
 from twb_lint.validation.registry import register
 from twb_lint.validation.rule import RuleBase, Stage
+
+MAX_FINDINGS = 200
+"""한 파일에서 낼 L-A finding 상한.
+
+XSD가 어긋나기 시작하면 오류가 수천 건까지 간다 — 전부 실으면 리포트가 못 읽는 물건이
+되고, 소비자가 AI라 앞의 몇 건이 묻힌다. 잘린 사실은 `note_partial`로 **반드시 보고한다**
+(조용히 자르면 "이게 전부"로 읽힌다 — 02 S5)."""
 
 # --- A3. L-A 위반의 심각도 정책 (2026-07-29 실측으로 확정) ---------------------------
 #
@@ -79,6 +90,22 @@ def severity_for(type_name: str, message: str) -> Severity:
     return Severity.WARNING
 
 
+@lru_cache(maxsize=4)
+def load_schema(xsd_path: str) -> Any:
+    """vendored XSD를 컴파일한 `XMLSchema`. **경로 기준으로 캐시한다.**
+
+    MCP 서버는 상주 프로세스라 검증 호출마다 재컴파일하면 그 비용이 매 호출에 실린다
+    (26MB급 스키마 컴파일은 싸지 않다 — TODO E1, AC5와 충돌). 릴리스 수가 손에 꼽으므로
+    maxsize 4로 충분하다.
+
+    ⚠️ 캐시된 `XMLSchema`는 **호출 간 공유**된다. lxml 스키마 객체는 스레드 안전이
+    보장되지 않으므로, 서버를 멀티스레드로 돌릴 때는 여기에 락이 필요하다.
+    """
+    from lxml import etree
+
+    return etree.XMLSchema(etree.parse(xsd_path, safety.make_parser()))
+
+
 @register
 class XsdRule(RuleBase):
     id = "xsd.schema"
@@ -115,9 +142,49 @@ class XsdRule(RuleBase):
             ctx.note_skip(self.id, "트리를 파싱하지 못해 구문 검증을 하지 못했다")
             return []
 
-        # 구현: config.xsd_path(release)로 XMLSchema 로드(캐시) →
-        #       schema.validate(ctx.normalized_tree()) →
-        #       error_log의 각 error를 severity_for(e.type_name, e.message)로 등급 매겨
-        #       Finding(line=e.line, location=e.path)로 변환.
-        ctx.note_skip(self.id, "규칙 미구현 (스캐폴딩)")
-        return []
+        path = config.xsd_path(release)
+        if path is None:
+            # 릴리스는 지원 목록에 있는데 파일이 없다 = 패키징 사고다. 파일의 문제가
+            # 아니므로 ERROR가 아니다 (02 S1-6).
+            ctx.note_skip(self.id, f"릴리스 {release}의 vendored XSD 파일이 없다")
+            return [
+                Finding(
+                    severity=Severity.WARNING,
+                    rule_id=self.id,
+                    location="(vendored XSD)",
+                    message=f"릴리스 {release}의 XSD를 찾지 못해 구문 검증을 건너뛴다",
+                    fix="tools/vendor_schemas.py를 돌려 data/schemas를 채운다.",
+                )
+            ]
+
+        schema = load_schema(str(path))
+        # 정규화 사본을 본다 — fcp 접두사를 벗기지 않으면 정상본 9/9가 실패한다 (G2).
+        # deepcopy는 `sourceline`을 보존하므로 오류의 줄번호는 **원본 .twb 기준**이다.
+        normalized = ctx.normalized_tree()
+        if normalized is None:  # raw_tree가 있으면 여기 오지 않는다 (위에서 걸렀다)
+            ctx.note_skip(self.id, "정규화 트리를 만들지 못해 구문 검증을 하지 못했다")
+            return []
+
+        if schema.validate(normalized.getroottree()):
+            return []
+
+        # `error_log`는 다음 validate 호출에서 덮어쓰인다 — 즉시 스냅샷을 뜬다.
+        errors = list(schema.error_log)
+        if len(errors) > MAX_FINDINGS:
+            ctx.note_partial(
+                self.id,
+                f"XSD 오류 {len(errors)}건 중 앞 {MAX_FINDINGS}건만 보고한다",
+                scope="xsd-errors",
+            )
+            errors = errors[:MAX_FINDINGS]
+
+        return [
+            Finding(
+                severity=severity_for(e.type_name, e.message),
+                rule_id=self.id,
+                location=e.path or "workbook",
+                message=e.message,
+                line=e.line or None,
+            )
+            for e in errors
+        ]

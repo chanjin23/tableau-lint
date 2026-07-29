@@ -129,14 +129,33 @@ def test_xsd_is_blind_to_semantic_defects(
         )
 
 
-@pytest.mark.stub
-def test_ac2_detection_is_not_measurable_yet(broken_set: dict[str, Path]) -> None:
-    """**stub 사실 고정** — 규칙이 전부 미구현이라 고장본이 게이트를 통과한다.
+def test_xsd_recipes_now_fail_the_gate(broken_set: dict[str, Path]) -> None:
+    """AC2 부분 측정 — R4·R7은 게이트가 **막는다**.
 
-    규칙을 구현하면 `passed`가 False로 바뀌며 이 테스트가 깨진다.
-    그때 고칠 것은 코드가 아니라 이 테스트다 — AC2 검출율 단언으로 바꾼다.
+    `test_xsd_catches_syntax_level_defects`는 스키마를 직접 태워 확인한다. 여기서는
+    같은 사실이 **엔진을 통과해** 게이트 판정까지 도달하는지를 본다 — 규칙 배선이
+    빠지면 앞 테스트만 통과하고 게이트는 조용히 승인한다.
     """
     from twb_lint.validation import engine
 
-    for path in broken_set.values():
-        assert engine.validate(path).passed is True
+    for recipe_id in CAUGHT_BY_XSD & broken_set.keys():
+        report = engine.validate(broken_set[recipe_id])
+        assert not report.passed, f"{recipe_id}가 게이트를 통과했다"
+        assert any(f.rule_id == "xsd.schema" for f in report.errors), (
+            f"{recipe_id}를 막은 것이 L-A가 아니다"
+        )
+
+
+@pytest.mark.stub
+def test_semantic_recipes_still_pass_the_gate(broken_set: dict[str, Path]) -> None:
+    """**stub 사실 고정** — L-B 규칙이 미구현이라 이 고장본들이 게이트를 통과한다.
+
+    이것이 AC3(무거짓통과) 위반의 실측이다. 규칙 ③·⑥을 구현하면 `passed`가 False로
+    바뀌며 깨진다 — 그때 고칠 것은 코드가 아니라 이 테스트다.
+    """
+    from twb_lint.validation import engine
+
+    for recipe_id in INVISIBLE_TO_XSD & broken_set.keys():
+        assert engine.validate(broken_set[recipe_id]).passed is True, (
+            f"{recipe_id}를 이제 무언가가 잡는다 — 이 테스트를 검출 단언으로 바꾼다"
+        )

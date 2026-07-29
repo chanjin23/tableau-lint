@@ -7,9 +7,9 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `108 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 46 source files`
-(골든셋 미설정 시 `99 passed, 9 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `114 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 47 source files`
+(골든셋 미설정 시 `104 passed, 10 skipped`)
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -33,15 +33,15 @@
       "재압축하지 않는다"를 경로로 보장한다. 엔트리 타임스탬프는 고정값 — 원본 mtime은
       unpack 시점에 이미 사라지므로 재현성을 택했다
 
-## 2. L-A (구문 검증) ← 다음
+## 2. L-A (구문 검증) ✅ 완료
 
-- [ ] **2a.** XSD 로드 + **컴파일 캐시** (TODO E1 동시 처리 — MCP 상주 프로세스라 매 호출
-      재컴파일하면 AC5와 충돌)
-- [ ] **2b.** `schema.validate(ctx.normalized_tree())` → `severity_for()` 등급 →
-      `Finding(line=e.line, location=e.path)`
-- [ ] **2c.** 정상 9개 **ERROR 0건** 확인 · 주입본 R4·R7이 ERROR로 잡히는지 확인
+- [x] **2a.** XSD 로드 + **컴파일 캐시** (`load_schema`, `lru_cache` 경로 키. TODO E1 해소).
+      ⚠️ 캐시된 `XMLSchema`는 호출 간 공유 — 멀티스레드 서버면 락이 필요하다(코드에 명시)
+- [x] **2b.** `schema.validate(ctx.normalized_tree())` → `severity_for()` 등급 →
+      `Finding(line=e.line, location=e.path)`. 상한 200건 + 초과 시 `note_partial`
+- [x] **2c.** 정상본 10/10 **ERROR 0 · WARNING 0** · 주입본 R4·R7이 게이트를 막는다(실측)
 
-## 3. calc
+## 3. calc ← 다음
 
 - [ ] **3a. `calc/extractor.py`** — 수집 표면 2곳: `<calculation@formula>` ·
       `<groupfilter@expression>`. 후자가 `//` 주석 · XML 엔티티 · 개행을 전부 담는다
@@ -74,3 +74,4 @@
 | 2 | 1b `twb.parse`/`read_version`/`serialize` | 92 passed, 1 xfailed | 0 | io 예외를 `safety.InputError`로 통일(03 D9.1). XXE가 `parse()` 경로를 실제로 통과하는지 파일로 검사 |
 | 3 | 1c `load_context` 모델 실채움 | 102 passed, 1 xfailed | 0 | 골든셋 10개 추출 실측: ds 2~5 · 필드 73~240 · calc 56~111 · ws=win=zone=vp 전부 일치. **픽스처 결함 2건**(`<datasources>` 래퍼 누락 · 시트 존에 `type-v2`)을 실측 기준으로 교정 |
 | 4 | 1d `twbx.pack` | **108 passed** (xfail 0) | 0 | **AC8 뒤집힘 — io 1단계 완료.** CLAUDE.md·07의 게이트 수치도 갱신 |
+| 5 | 2a~2c L-A 배선 | 114 passed | **0** | 정상본 10/10 ERROR 0·WARNING 0. R4·R7이 게이트를 막는다. 54ms/file(스키마 컴파일 포함). stub 테스트 `test_ac2_...`를 검출 단언 + AC3 실측으로 분리 |
