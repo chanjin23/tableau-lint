@@ -11,6 +11,7 @@
 |---|---|
 | **프로젝트 정보** | [`docs/tableau-ai-sor.md`](./docs/tableau-ai-sor.md) — SOR 인덱스. 여기서 시작 |
 | **구현 시 필수** | [`docs/07-implementation-guide.md`](./docs/07-implementation-guide.md) — G1~G7 함정 · 검증 파이프라인 · 관례 |
+| **지금 할 일** | [`TODO.md`](./TODO.md) — 구현 착수 전 체크리스트 (설계 미결·데이터·라벨링 배치) |
 
 `docs/`가 권위 문서다. 이 파일과 어긋나면 **`docs/` 우선.**
 
