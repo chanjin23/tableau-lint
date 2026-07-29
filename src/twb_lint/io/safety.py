@@ -144,6 +144,11 @@ def safe_extract_path(dest_root: Path, entry_name: str) -> Path | None:
     `zipfile.extractall`은 절대경로·`..`를 걸러주지만 심볼릭 링크 엔트리와
     드라이브 지정(`C:\\...`)까지 보장하지는 않는다. 목적지 하위인지를 **해석된 경로로**
     직접 확인한다.
+
+    아래 절대경로 조기 반환은 **중복 방어(defense in depth)** 다. `resolve()` +
+    `relative_to()`가 이미 세 경우(`/abs`·`C:\\abs`·`../`)를 전부 차단하는 것을 확인했다.
+    지워도 동작이 같아서 테스트로는 구분되지 않지만, 의도를 코드로 남기고 `resolve()`
+    동작이 플랫폼에 따라 달라질 때를 대비해 유지한다.
     """
     if entry_name.startswith("/") or entry_name.startswith("\\"):
         return None

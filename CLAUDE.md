@@ -20,13 +20,13 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 57 passed, 8 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 67 passed, 8 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
-.venv/Scripts/python -m mypy             # Success: no issues in 29 source files
+.venv/Scripts/python -m mypy             # Success: no issues in 43 source files
 ```
 
 하나라도 깨지면 커밋하지 않는다. 규칙을 구현했으면 **실파일 회귀**까지 —
-골든셋 경로를 환경변수로 걸면 `64 passed, 1 xfailed`가 된다 (xfail = AC8, io 구현 시 해제).
+골든셋 경로를 환경변수로 걸면 `74 passed, 1 xfailed`가 된다 (xfail = AC8, io 구현 시 해제).
 절차는 [`07-implementation-guide.md`](./docs/07-implementation-guide.md) §2.
 
 ```bash

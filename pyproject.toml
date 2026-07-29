@@ -39,7 +39,10 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["twb_lint"]
+# tests·tools도 검사한다 (mypy는 packages와 files를 동시에 못 받는다).
+# 테스트에 타입 오류가 있으면 **의도한 것을 검사하지 못하고 있을 수 있다** —
+# 실제로 범위를 넓혔더니 죽은 `type: ignore` 2건이 드러났다.
+files = ["src", "tests", "tools"]
 strict = true
 
 [[tool.mypy.overrides]]

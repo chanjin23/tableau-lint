@@ -189,12 +189,42 @@ VS Code: **Ctrl+Shift+B** = 게이트 전체. F5 = 디버그 실행(CLI·MCP·py
 기대 출력 (2026-07-29 기준):
 
 ```
-57 passed, 8 skipped
+67 passed, 8 skipped
 All checks passed!
-Success: no issues found in 29 source files
+Success: no issues found in 43 source files
 ```
 
 `skipped` 8건은 골든셋 테스트다 — 경로 환경변수가 없으면 건너뛴다(아래).
+
+**mypy는 `src`·`tests`·`tools`를 전부 본다.** 테스트에 타입 오류가 있으면 그 테스트가
+의도한 것을 검사하지 못하고 있을 수 있다 — 실제로 범위를 넓혔더니 죽은 `type: ignore`
+2건이 드러났다.
+
+### 게이트가 실제로 무엇을 잡는지 (2026-07-29 확인)
+
+green이라는 사실과 게이트가 **실패를 잡는다**는 사실은 다르다. 방어선을 하나씩 고의로
+깨뜨려 확인했다 — 12건 중 11건 검출:
+
+| 깨뜨린 것 | 잡은 게이트 |
+|---|---|
+| 규칙이 `note_skip` 없이 조용히 통과 | pytest (계약 2) |
+| 규칙이 원본 트리를 변경 | pytest (계약 3) |
+| **규칙 ⑥-a가 정규화 후 트리를 봄** | pytest (계약 4, 호출 감시) |
+| findings 정렬 제거 / line을 문자열 정렬 | pytest |
+| fcp 정규화가 속성 키를 놓침 | pytest |
+| fcp가 매니페스트 항목을 "사용"으로 셈 | pytest |
+| 파서 엔티티 방어 해제 | pytest (실제 XXE·폭탄 페이로드) |
+| 입력 점검 무력화 | pytest + mypy |
+| **`Missing child` 분기를 ERROR로** | pytest (A3 정책 테스트) |
+| 미지원 릴리스를 조용히 통과 | pytest |
+| XSD 패치/스텁 제거 · 함수 목록 훼손 · gates에 미매핑 항목 | pytest (골든셋 포함 4/4) |
+
+미검출 1건은 `safe_extract_path`의 절대경로 조기 반환인데, `resolve()` + `relative_to()`가
+같은 경우를 전부 막는 **중복 방어**라 동작 차이가 없다(코드에 명시해 뒀다).
+
+굵게 표시한 둘은 **처음엔 아무도 못 잡았다.** 규칙 ⑥-a의 트리 선택은 구현이 들어와야
+차이가 나고, A3 심각도 정책은 단위 테스트가 없었다. 둘 다 구현 단계에서 조용히 틀릴
+자리였다 — 지금 막았다.
 
 ### 골든셋 경로 (실파일 회귀)
 
@@ -210,7 +240,7 @@ export TWB_LINT_GOLDEN_NORMAL='C:/dev/JW/2.개발/MA_002_경영관리-재무-현
 $env:TWB_LINT_GOLDEN_NORMAL = 'C:\dev\JW\2.개발\MA_002_경영관리-재무-현금흐름\*.twbx;C:\dev\JW\2.개발\MA_004_경영관리-재무-손익계산서\*_JWLH_*.twbx;C:\dev\태블로판차분석_제약_260616_진행중_2.twbx'
 ```
 
-설정하면 `pytest -q`가 64 passed + 1 xfailed가 된다(xfail = AC8, `io` 미구현).
+설정하면 `pytest -q`가 74 passed + 1 xfailed가 된다(xfail = AC8, `io` 미구현).
 
 ### 규칙을 구현·추가했을 때 추가로 할 것
 

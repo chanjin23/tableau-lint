@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from lxml import etree
@@ -95,16 +96,16 @@ def test_c4_hyper_survives_a_roundtrip_byte_for_byte(
     assert _hyper_bytes(repacked) == before
 
 
-def _load_twb_root(path: Path, parser: object) -> object:
+def _load_twb_root(path: Path, parser: Any) -> Any:
     """`.twb`/`.twbx`에서 루트 element를 얻는다 (테스트 전용 최소 로더)."""
     if path.suffix.lower() == ".twb":
-        return etree.parse(str(path), parser).getroot()  # type: ignore[arg-type]
+        return etree.parse(str(path), parser).getroot()
     with zipfile.ZipFile(path) as zf:
         names = [n for n in zf.namelist() if n.lower().endswith(".twb")]
         if not names:
             return None
         with zf.open(names[0]) as fh:
-            return etree.parse(fh, parser).getroot()  # type: ignore[arg-type]
+            return etree.parse(fh, parser).getroot()
 
 
 def _hyper_bytes(twbx_path: Path) -> dict[str, bytes]:
