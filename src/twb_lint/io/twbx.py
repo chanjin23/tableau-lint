@@ -20,17 +20,8 @@ _CHUNK = 1024 * 1024
 """해제 시 한 번에 읽는 크기. 통째로 `read()`하면 zip bomb이 상한 검사 전에 메모리를 먹는다."""
 
 
-class ArchiveError(Exception):
-    """`.twbx`를 열 수 없거나 해제 정책을 위반했다.
-
-    `InputProblem`을 실어 나른다 — 심각도 배정과 메시지 조립은 엔진의 몫이고,
-    io 계층은 무엇이 잘못됐는지만 말한다 (`safety.InputProblem` 주석과 같은 이유).
-    검증 경로에서는 `inspect.load_context()`가 이걸 잡아 문제 목록으로 바꾼다 (02 S5).
-    """
-
-    def __init__(self, problem: safety.InputProblem) -> None:
-        super().__init__(problem.detail)
-        self.problem = problem
+class ArchiveError(safety.InputError):
+    """`.twbx`를 열 수 없거나 해제 정책을 위반했다. 계약은 `safety.InputError` (03 D9.1)."""
 
 
 @dataclass(slots=True)

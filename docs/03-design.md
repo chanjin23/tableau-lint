@@ -432,9 +432,11 @@ XML/ZIP의 고전적 함정이 그대로 열린다. 정책을 io 구현 뒤로 �
 
 ### D9.1 unpack의 오류 전달 — `ArchiveError` (v1.4)
 
-`io.twbx.unpack()`은 정책 위반 시 **`ArchiveError`를 던진다** — `InputProblem`을 실어서다.
-반환값으로 문제를 섞지 않는 이유는 unpack이 MCP `twb_unpack`에서 **검증과 무관하게**
-직접 쓰이기 때문이다. 거기서는 실패가 곧 도구 실패지 finding이 아니다.
+io 함수는 실패 시 **`safety.InputError`를 던진다** — `InputProblem`을 실어서다.
+반환값으로 문제를 섞지 않는 이유는 io가 MCP 도구에서 **검증과 무관하게** 직접 쓰이기
+때문이다. 거기서는 실패가 곧 도구 실패지 finding이 아니다. 하위 예외는
+`twbx.ArchiveError`(ZIP)·`twb.MalformedXmlError`(XML)이며, 호출자는 실패 종류를 몰라도
+기반 클래스 하나로 잡을 수 있다.
 
 검증 경로에서만 `inspect.load_context()`가 이걸 잡아 문제 목록으로 바꾼다. 그래서
 "입력 오류는 예외가 아니라 finding"(02 S5)이 **엔진 경계에서** 그대로 성립한다.

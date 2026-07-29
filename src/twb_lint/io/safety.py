@@ -56,6 +56,7 @@ class ProblemKind(StrEnum):
     UNREADABLE = "unreadable"
     CORRUPT_ARCHIVE = "corrupt_archive"
     UNSAFE_ARCHIVE = "unsafe_archive"
+    MALFORMED_XML = "malformed_xml"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +70,22 @@ class InputProblem:
     kind: ProblemKind
     detail: str
     fix: str | None = None
+
+
+class InputError(Exception):
+    """io 계층이 입력을 열지 못했다. `InputProblem`을 실어 나른다.
+
+    io 함수들은 MCP 도구(`twb_unpack` 등)에서 **검증과 무관하게** 직접 쓰인다.
+    거기서는 실패가 곧 도구 실패지 finding이 아니므로 예외가 맞다. 검증 경로에서만
+    `inspect.load_context()`가 이걸 잡아 문제 목록으로 바꾼다 — 그래서 "입력 오류는
+    예외가 아니라 finding"(02 S5)이 **엔진 경계에서** 그대로 성립한다 (03 D9.1).
+
+    호출자가 io의 실패 종류를 몰라도 되도록 하위 예외는 전부 이걸 상속한다.
+    """
+
+    def __init__(self, problem: InputProblem) -> None:
+        super().__init__(problem.detail)
+        self.problem = problem
 
 
 def make_parser() -> Any:
