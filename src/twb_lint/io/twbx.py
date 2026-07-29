@@ -70,6 +70,17 @@ def unpack(path: Path, dest: Path) -> Unpacked:
                 fix="Tableau에서 다시 저장하거나, 파일이 전송 중 잘리지 않았는지 확인한다.",
             )
         ) from exc
+    except OSError as exc:
+        # 파일이 없거나 권한이 없으면 `zipfile.ZipFile`이 BadZipFile이 아니라 OSError를
+        # 던진다. 이걸 흘려보내면 io 계층의 실패 계약(D9.1)이 깨져서, 호출자가
+        # `safety.InputError` 하나로 잡던 것을 놓친다 (MCP 도구에서 실측으로 드러났다).
+        raise ArchiveError(
+            safety.InputProblem(
+                safety.ProblemKind.UNREADABLE,
+                f"`.twbx`를 열 수 없다: {exc}",
+                fix="경로를 확인한다. 상대경로면 작업 디렉토리 기준으로 해석된다.",
+            )
+        ) from exc
 
     twb_path = _pick_twb(extracted)
     if twb_path is None:

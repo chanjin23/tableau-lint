@@ -12,12 +12,17 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from twb_lint import config
+from twb_lint import __version__, config
 from twb_lint import inspect as inspector
 from twb_lint.io import twbx
 from twb_lint.validation import engine
 
 mcp = FastMCP("twb-lint")
+
+# FastMCP는 버전을 받지 않고, 저수준 서버는 비어 있으면 **MCP SDK 버전**으로 채운다.
+# 그대로 두면 호스트가 "twb-lint 1.28.1"을 보게 되어 어떤 검증기가 붙었는지 알 수 없다
+# (실측으로 드러났다). 게이트가 판정을 내리는 도구라 버전 오인은 값이 크다.
+mcp._mcp_server.version = __version__
 
 
 @mcp.tool()
