@@ -5,7 +5,7 @@
 
 대상: Tableau **2026.1 단독 · 로컬 오프라인**.
 현 단계: **io + L-A 완료** — unpack/pack · 파싱 · 모델 추출 · XSD 구문 검증이 실로직이다
-(AC8 통과 · 정상본 ERROR 0). **L-B는 규칙 ①② 가동 · ③⑥ stub.** 다음은 규칙 ③·⑥.
+(AC8 통과 · 정상본 ERROR 0). **L-B는 규칙 ①②③ 가동 · ⑥만 stub.** 다음은 규칙 ⑥.
 진행 상황은 [`docs/impl-progress.md`](./docs/impl-progress.md)가 갖는다.
 
 ## 작업 전 반드시 읽는다
@@ -21,13 +21,13 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 142 passed, 11 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 149 passed, 12 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
-.venv/Scripts/python -m mypy             # Success: no issues in 52 source files
+.venv/Scripts/python -m mypy             # Success: no issues in 53 source files
 ```
 
 하나라도 깨지면 커밋하지 않는다. 규칙을 구현했으면 **실파일 회귀**까지 —
-골든셋 경로를 환경변수로 걸면 `153 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
+골든셋 경로를 환경변수로 걸면 `161 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
 절차는 [`07-implementation-guide.md`](./docs/07-implementation-guide.md) §2.
 
 ```bash

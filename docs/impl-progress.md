@@ -7,9 +7,9 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `153 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 52 source files`
-(골든셋 미설정 시 `142 passed, 11 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `161 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 53 source files`
+(골든셋 미설정 시 `149 passed, 12 skipped`)
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -65,7 +65,10 @@
 
 ## 4. 나머지 규칙 ← 다음
 
-- [ ] **4a. 규칙 ③** 참조 무결성 3자 대조 (worksheet · dashboard · window)
+- [x] **4a. 규칙 ③** 3자 대조. **유일하게 ERROR를 내는 규칙** — 표본 10개 전부에서
+      `zone ⊆ worksheets ∧ zone ⊆ viewpoints ∧ worksheets == worksheet_windows`라는 실측이
+      근거다. 배치되지 않은 시트는 보고하지 않는다(정상이다).
+      **주입본 R2·R3가 이제 게이트에서 막힌다 — AC3 무거짓통과의 해소 실증**
 - [ ] **4b. 규칙 ⑥** — ⑥-a fcp(`ctx.raw_tree` 필수, `fcp.py`가 이미 다 준다) ·
       ⑥-b `manifest_gates.json` gates 2종
 
@@ -92,3 +95,4 @@
 | 8 | 3b-2·3b-3 필드 유니버스 + 규칙 ② 심각도 | 138 passed | 0 | 미해소 687→94. **남은 94건이 정상 파일의 실제 잔재 참조**임을 확인 → 규칙 ②를 ERROR→WARNING 하향 (03 v1.7 D3.6.3) |
 | 9 | 3c 규칙 ① | 144 passed | **0** | 골든셋 10개에서 finding 0건(ERROR·WARNING 모두). stub 목록에서 `calc.functions` 제거 |
 | 10 | 3d 규칙 ② | 153 passed | **24** | 골든셋 ERROR 0 · WARNING 24(파일당 1~6). 전부 실제 잔재 참조이며 D3.6.3 예측과 일치. 3단계 완료 |
+| 11 | 4a 규칙 ③ | 161 passed | 24 | 골든셋 ERROR 0 유지. **R2·R3가 게이트에서 막힌다** — L-A가 원리적으로 못 잡는 것을 L-B가 잡는 첫 실증. 남은 미검출은 R1a·R1b(규칙 ⑥) |

@@ -36,6 +36,12 @@ INVISIBLE_TO_XSD = {
     "R3-dangling-zone",
 }
 
+# L-A는 못 잡지만 **L-B 규칙 ③이 잡는** 레시피 (3자 대조).
+CAUGHT_BY_NAMED_REFS = {"R2-drop-viewpoint", "R3-dangling-zone"}
+
+# 아직 아무 규칙도 못 잡는 레시피 — 규칙 ⑥이 담당할 자리다.
+STILL_UNDETECTED = INVISIBLE_TO_XSD - CAUGHT_BY_NAMED_REFS
+
 
 def _load_injector() -> Any:
     spec = importlib.util.spec_from_file_location(
@@ -146,16 +152,32 @@ def test_xsd_recipes_now_fail_the_gate(broken_set: dict[str, Path]) -> None:
         )
 
 
-@pytest.mark.stub
-def test_semantic_recipes_still_pass_the_gate(broken_set: dict[str, Path]) -> None:
-    """**stub 사실 고정** — L-B 규칙이 미구현이라 이 고장본들이 게이트를 통과한다.
+def test_named_refs_catches_what_xsd_cannot(broken_set: dict[str, Path]) -> None:
+    """**AC3 무거짓통과의 해소** — XSD가 원리적으로 못 잡는 것을 규칙 ③이 막는다.
 
-    이것이 AC3(무거짓통과) 위반의 실측이다. 규칙 ③·⑥을 구현하면 `passed`가 False로
-    바뀌며 깨진다 — 그때 고칠 것은 코드가 아니라 이 테스트다.
+    R2·R3는 이름 대조라 문법으로는 판정할 수 없다. 이 둘이 게이트를 통과하던 것이
+    이 프로젝트의 존재 이유였다.
     """
     from twb_lint.validation import engine
 
-    for recipe_id in INVISIBLE_TO_XSD & broken_set.keys():
+    for recipe_id in CAUGHT_BY_NAMED_REFS & broken_set.keys():
+        report = engine.validate(broken_set[recipe_id])
+        assert not report.passed, f"{recipe_id}가 게이트를 통과했다"
+        assert any(f.rule_id == "named.refs" for f in report.errors), (
+            f"{recipe_id}를 막은 것이 규칙 ③이 아니다"
+        )
+
+
+@pytest.mark.stub
+def test_manifest_recipes_still_pass_the_gate(broken_set: dict[str, Path]) -> None:
+    """**stub 사실 고정** — 규칙 ⑥이 미구현이라 R1a·R1b가 게이트를 통과한다.
+
+    규칙 ⑥을 구현하면 `passed`가 False로 바뀌며 깨진다 — 그때 고칠 것은 코드가 아니라
+    이 테스트다.
+    """
+    from twb_lint.validation import engine
+
+    for recipe_id in STILL_UNDETECTED & broken_set.keys():
         assert engine.validate(broken_set[recipe_id]).passed is True, (
             f"{recipe_id}를 이제 무언가가 잡는다 — 이 테스트를 검출 단언으로 바꾼다"
         )
