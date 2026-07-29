@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- W3C xml 네임스페이스 속성의 최소 정의. 공식 XSD가 schemaLocation 없이 import 한다.
+     근거: docs/05-xsd-spike.md F1. 이 파일은 우리 산출물이며 상류에 없다. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.w3.org/XML/1998/namespace"
+           xmlns:xml="http://www.w3.org/XML/1998/namespace">
+  <xs:attribute name="lang" type="xs:string"/>
+  <xs:attribute name="space" type="xs:string"/>
+  <xs:attribute name="base" type="xs:anyURI"/>
+  <xs:attribute name="id" type="xs:ID"/>
+</xs:schema>

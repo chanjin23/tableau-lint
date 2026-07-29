@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 공식 XSD가 참조만 하고 정의를 주지 않는 attributeGroup의 관대한 스텁.
+     근거: docs/05-xsd-spike.md F1. 이 파일은 우리 산출물이며 상류에 없다. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.tableausoftware.com/xml/user"
+           elementFormDefault="qualified">
+  <xs:attributeGroup name="UserAttributes-AG">
+    <xs:anyAttribute namespace="##any" processContents="skip"/>
+  </xs:attributeGroup>
+</xs:schema>

@@ -1,0 +1,14 @@
+vendored Tableau document schemas
+=================================
+
+출처     https://github.com/tableau/tableau-document-schemas
+라이선스 Apache License 2.0 — Copyright (c) 2024 Salesforce, Inc.
+
+`twb_*.xsd`는 상류 원본에 **패치가 적용된 사본**이다. 원본 그대로가 아니다.
+패치 목록과 사유는 tools/vendor_schemas.py의 PATCHES에 있으며,
+실측 근거는 docs/05-xsd-spike.md F1·F3이다.
+
+`user-stub.xsd`·`xml-stub.xsd`는 상류에 없는 **우리 산출물**이다 —
+공식 XSD가 참조만 하고 정의를 주지 않는 두 네임스페이스를 메운다.
+
+재생성: .venv/Scripts/python tools/vendor_schemas.py
