@@ -189,9 +189,9 @@ VS Code: **Ctrl+Shift+B** = 게이트 전체. F5 = 디버그 실행(CLI·MCP·py
 기대 출력 (2026-07-29 기준):
 
 ```
-149 passed, 12 skipped
+158 passed, 12 skipped
 All checks passed!
-Success: no issues found in 53 source files
+Success: no issues found in 54 source files
 ```
 
 `skipped` 8건은 골든셋 테스트다 — 경로 환경변수가 없으면 건너뛴다(아래).
@@ -240,7 +240,7 @@ export TWB_LINT_GOLDEN_NORMAL='C:/dev/JW/2.개발/MA_002_경영관리-재무-현
 $env:TWB_LINT_GOLDEN_NORMAL = 'C:\dev\JW\2.개발\MA_002_경영관리-재무-현금흐름\*.twbx;C:\dev\JW\2.개발\MA_004_경영관리-재무-손익계산서\*_JWLH_*.twbx;C:\dev\태블로판차분석_제약_260616_진행중_2.twbx'
 ```
 
-설정하면 `pytest -q`가 161 passed가 된다. AC8(`.hyper` 라운드트립)은 io 1단계가
+설정하면 `pytest -q`가 170 passed가 된다. AC8(`.hyper` 라운드트립)은 io 1단계가
 끝나 xfail에서 풀렸다 — 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
 
 ### 규칙을 구현·추가했을 때 추가로 할 것
@@ -334,7 +334,7 @@ XSD로 검증하게 되고 정상본이 전부 ERROR가 난다. 상류 갱신 �
 2. ~~`syntactic/xsd.py` — 스키마 로드(캐시) + `severity_for()` 적용~~ ✅
    - 정상본 10/10 ERROR 0 · WARNING 0, 주입본 R4·R7이 게이트를 막는다 (2026-07-29 실측)
 3. ~~`calc/extractor.py` + 규칙 ①②~~ ✅ (정상본 ERROR 0 · WARNING 24)
-4. 규칙 ③(R2·R3 3자 대조) / 규칙 ⑥(⑥-a는 `fcp` 모듈이 이미 다 준다) ← **다음**
-5. 사용자 라벨링 배치 → AC2·AC3 수치 고정
+4. ~~규칙 ③(R2·R3 3자 대조) / 규칙 ⑥~~ ✅ (주입 6종 중 5종 차단)
+5. 사용자 라벨링 배치 → AC2·AC3 수치 고정 ← **다음. 루프가 할 수 없다(Tableau Desktop 필요)**
 
 각 단계 후 `pytest`(골든셋 포함)·`ruff`·`mypy` 3종을 돌린다.

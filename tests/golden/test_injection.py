@@ -39,8 +39,13 @@ INVISIBLE_TO_XSD = {
 # L-A는 못 잡지만 **L-B 규칙 ③이 잡는** 레시피 (3자 대조).
 CAUGHT_BY_NAMED_REFS = {"R2-drop-viewpoint", "R3-dangling-zone"}
 
-# 아직 아무 규칙도 못 잡는 레시피 — 규칙 ⑥이 담당할 자리다.
-STILL_UNDETECTED = INVISIBLE_TO_XSD - CAUGHT_BY_NAMED_REFS
+# 규칙 ⑥-b가 잡는 레시피 (대응표 2쌍 중 하나).
+CAUGHT_BY_MANIFEST = {"R1b-drop-SortTagCleanup"}
+
+# 게이트를 통과하는 유일한 레시피. **의도된 상태다** — ⑥-a는 관계만 확인했고
+# "항목을 지우면 실제로 로드가 거부된다"는 인과가 미검증이라 WARNING이다 (05 F7).
+# 실험 A(TODO D)로 인과가 확정되면 ERROR로 올리고 이 테스트를 검출 단언으로 바꾼다.
+WARNING_ONLY = {"R1a-drop-fcp-manifest-item"}
 
 
 def _load_injector() -> Any:
@@ -168,16 +173,33 @@ def test_named_refs_catches_what_xsd_cannot(broken_set: dict[str, Path]) -> None
         )
 
 
-@pytest.mark.stub
-def test_manifest_recipes_still_pass_the_gate(broken_set: dict[str, Path]) -> None:
-    """**stub 사실 고정** — 규칙 ⑥이 미구현이라 R1a·R1b가 게이트를 통과한다.
+def test_manifest_gate_catches_the_mapped_recipe(broken_set: dict[str, Path]) -> None:
+    """R1b — 대응표에 있는 쌍(`manual-sort` ↔ `SortTagCleanup`)은 ERROR다.
 
-    규칙 ⑥을 구현하면 `passed`가 False로 바뀌며 깨진다 — 그때 고칠 것은 코드가 아니라
-    이 테스트다.
+    XSD는 `manual-sort`를 무조건 허용한다. 이 파일이 L-A를 통과하고 Tableau에서
+    열리지 않는 것이 규칙 ⑥의 존재 이유다 (05 F5).
     """
     from twb_lint.validation import engine
 
-    for recipe_id in STILL_UNDETECTED & broken_set.keys():
-        assert engine.validate(broken_set[recipe_id]).passed is True, (
-            f"{recipe_id}를 이제 무언가가 잡는다 — 이 테스트를 검출 단언으로 바꾼다"
+    for recipe_id in CAUGHT_BY_MANIFEST & broken_set.keys():
+        report = engine.validate(broken_set[recipe_id])
+        assert not report.passed, f"{recipe_id}가 게이트를 통과했다"
+        assert any(f.rule_id == "manifest.gates" for f in report.errors)
+
+
+@pytest.mark.stub
+def test_fcp_recipe_warns_but_does_not_block(broken_set: dict[str, Path]) -> None:
+    """R1a — **의도적으로 WARNING이다.** 관계는 표본 10/10에서 확인했지만, 항목을
+    지우면 실제로 로드가 거부되는지(인과)는 확인하지 못했다.
+
+    실험 A(TODO D)로 인과가 확정되면 ERROR로 올린다 — 그때 이 테스트를 검출 단언으로
+    바꾼다. 지금 ERROR로 올리면 우리 추론이 남의 정상 파일을 막는다.
+    """
+    from twb_lint.validation import engine
+
+    for recipe_id in WARNING_ONLY & broken_set.keys():
+        report = engine.validate(broken_set[recipe_id])
+        assert report.passed is True, f"{recipe_id}가 이제 막힌다 — 검출 단언으로 바꾼다"
+        assert any(f.rule_id == "manifest.gates" for f in report.findings), (
+            f"{recipe_id}에 대해 규칙 ⑥이 아무 말도 하지 않았다"
         )

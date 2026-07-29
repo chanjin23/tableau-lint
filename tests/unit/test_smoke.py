@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from twb_lint.models import (
     CoverageStatus,
     Finding,
@@ -182,23 +180,22 @@ def test_directory_and_bad_suffix_are_input_errors(tmp_path: Path) -> None:
     assert any("확장자" in f.message for f in report.errors)
 
 
-@pytest.mark.stub
-def test_stub_rules_report_themselves_as_unimplemented(tmp_path: Path) -> None:
-    """**stub 사실을 고정한 테스트다 — 실로직이 들어오면 깨져야 한다.**
+def test_no_rule_reports_itself_as_unimplemented(tmp_path: Path) -> None:
+    """스캐폴딩이 끝났다 — "규칙 미구현"이라고 보고하는 규칙은 이제 없다.
 
-    지금은 규칙이 전부 `return []`이라 findings가 없다. 그러나 **조용히 통과하지는 않는다** —
-    각 규칙이 "미구현이라 검사하지 못했다"를 coverage로 보고한다.
-
-    구현이 들어오면 해당 규칙의 note가 사라지고 이 단언이 깨진다.
-    그때 고칠 것은 **코드가 아니라 이 테스트다** (구현된 규칙을 목록에서 뺀다).
+    이 단언이 깨지면 규칙이 하나 되돌아간 것이다. (이 테스트는 원래
+    `@pytest.mark.stub`로 stub 사실을 고정하고 있었고, 규칙 5개가 전부 구현되면서
+    반대 방향의 단언으로 바뀌었다.)
     """
     twb = tmp_path / "empty.twb"
     twb.write_text("<workbook />", encoding="utf-8")
 
     report = engine.validate(twb)
-    unimplemented = {c.rule_id for c in report.skipped if c.reason == "규칙 미구현 (스캐폴딩)"}
-    assert unimplemented == {"manifest.gates"}
 
-    # xsd.schema만 **입력이 없어서** 스킵된다 — 미구현과 구분되는 별개의 사유다.
+    assert not [c for c in report.skipped if c.reason == "규칙 미구현 (스캐폴딩)"]
+
+    # 스킵 사유는 이제 전부 **입력이 없어서**다 — 미구현과 구분되는 별개의 사유다.
     reasons = {c.rule_id: (c.reason or "") for c in report.skipped}
     assert "미지원 릴리스" in reasons["xsd.schema"]  # source_build가 없어 릴리스 미확정
+    assert "데이터소스가 없어" in reasons["calc.field_refs"]
+    assert "대시보드가 없어" in reasons["named.refs"]

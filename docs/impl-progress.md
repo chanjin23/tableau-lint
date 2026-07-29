@@ -7,9 +7,24 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `161 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 53 source files`
-(골든셋 미설정 시 `149 passed, 12 skipped`)
+**현재** (2026-07-29, 골든셋 걸고 실측): `170 passed` ·
+`ruff All checks passed!` · `mypy Success: no issues found in 54 source files`
+(골든셋 미설정 시 `158 passed, 12 skipped`)
+
+## 🏁 07 §4의 1~4단계 전부 완료
+
+| 주입 레시피 | 판정 | 막은 계층 |
+|---|---|---|
+| R4 · R7 | ERROR | L-A (XSD) |
+| R2 · R3 | ERROR | 규칙 ③ |
+| R1b | ERROR | 규칙 ⑥-b |
+| R1a | WARNING (의도) | 규칙 ⑥-a — 인과 미검증 |
+
+정상본 10개: **ERROR 0** · WARNING 24 (전부 규칙 ②, 실제 잔재 참조).
+
+**남은 것은 5단계뿐이고 루프가 할 수 없다** — 사용자 라벨링 배치(TODO D1~D4)는
+Tableau Desktop 실행이 필요하다. 그것이 막는 것: 규칙 ⑥-a WARNING→ERROR 승격 ·
+규칙 ② ERROR 승격(표면별) · AC2/AC3/AC5 수치 확정.
 
 **1단계 완료.** AC8(`.hyper` 라운드트립 바이트 동일성) xfail이 통과로 뒤집혀 마커를 제거했다.
 여기가 다시 xfail로 돌아가면 무손실 보존이 깨진 것이다.
@@ -63,14 +78,16 @@
       특수 네임스페이스 3종 제외 · 이름별 1건(참조 개수 포함) · **WARNING 고정**.
       골든셋 10개 실측: ERROR 0 · **WARNING 24건**(파일당 1~6, 전부 실제 잔재 참조)
 
-## 4. 나머지 규칙 ← 다음
+## 4. 나머지 규칙 ✅ 완료
 
 - [x] **4a. 규칙 ③** 3자 대조. **유일하게 ERROR를 내는 규칙** — 표본 10개 전부에서
       `zone ⊆ worksheets ∧ zone ⊆ viewpoints ∧ worksheets == worksheet_windows`라는 실측이
       근거다. 배치되지 않은 시트는 보고하지 않는다(정상이다).
       **주입본 R2·R3가 이제 게이트에서 막힌다 — AC3 무거짓통과의 해소 실증**
-- [ ] **4b. 규칙 ⑥** — ⑥-a fcp(`ctx.raw_tree` 필수, `fcp.py`가 이미 다 준다) ·
-      ⑥-b `manifest_gates.json` gates 2종
+- [x] **4b. 규칙 ⑥** — ⑥-a fcp(`ctx.raw_tree`, **WARNING** — 인과 미검증) ·
+      ⑥-b 대응표 2쌍(**ERROR** — 로드 거부 메시지 실측).
+      매핑을 모르는 항목 16종은 `note_partial`로 "검사하지 못했다"를 보고한다.
+      **주입본 R1b가 게이트에서 막힌다**
 
 ## 보류 (사람이 Tableau를 열어야 한다 — 루프가 건드리지 않는다)
 
@@ -96,3 +113,4 @@
 | 9 | 3c 규칙 ① | 144 passed | **0** | 골든셋 10개에서 finding 0건(ERROR·WARNING 모두). stub 목록에서 `calc.functions` 제거 |
 | 10 | 3d 규칙 ② | 153 passed | **24** | 골든셋 ERROR 0 · WARNING 24(파일당 1~6). 전부 실제 잔재 참조이며 D3.6.3 예측과 일치. 3단계 완료 |
 | 11 | 4a 규칙 ③ | 161 passed | 24 | 골든셋 ERROR 0 유지. **R2·R3가 게이트에서 막힌다** — L-A가 원리적으로 못 잡는 것을 L-B가 잡는 첫 실증. 남은 미검출은 R1a·R1b(규칙 ⑥) |
+| 12 | 4b 규칙 ⑥ | **170 passed** | 24 | R1b 차단. **주입 6종 중 5종을 게이트가 막는다**(R1a는 의도적 WARNING). 07 §4 1~4단계 완료 |
