@@ -13,6 +13,20 @@ from twb_lint import __version__
 from twb_lint.validation import engine
 
 
+def _force_utf8_output() -> None:
+    """콘솔 인코딩과 무관하게 출력이 깨지지 않게 한다.
+
+    Windows 기본 콘솔은 cp949다. 메시지에 `—`나 한글 조합이 들어가면 출력 시점에
+    `UnicodeEncodeError`로 **검증 결과가 통째로 사라진다** — 게이트가 판정을 내놓고도
+    말을 못 하는 상태가 된다. `errors="replace"`까지 두는 이유는 인코딩 문제로
+    종료코드가 뒤집히면 안 되기 때문이다.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def _cmd_validate(path: str) -> int:
     report = engine.validate(path)
     for f in report.findings:
@@ -33,6 +47,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_val.add_argument("path", help=".twb 또는 .twbx 경로")
 
     args = parser.parse_args(argv)
+    _force_utf8_output()
     if args.cmd == "validate":
         return _cmd_validate(args.path)
     return 2
