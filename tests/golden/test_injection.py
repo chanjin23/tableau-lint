@@ -90,6 +90,37 @@ def broken_set(
     return made
 
 
+def test_every_recipe_is_caught_by_the_rule_it_declares(
+    broken_set: dict[str, Path], injector: Any, require_golden_normal: list[Path]
+) -> None:
+    """레시피가 지목한 규칙이 **실제로** 그 결함을 잡는가 (AC2의 일반형).
+
+    `CAUGHT_BY_*` 집합은 레시피가 늘 때마다 손으로 갱신해야 한다 — 갱신을 잊으면
+    새 레시피가 아무 검사도 받지 않고 조용히 지나간다. 이 테스트는 레시피 목록
+    자체를 입력으로 삼아 그 구멍을 막는다.
+
+    대조군도 같이 본다: **주입 전 원본에는 그 규칙의 finding이 없어야 한다.**
+    없으면 "규칙이 원래부터 그 파일에서 울고 있었다"와 구분되지 않는다.
+    """
+    from twb_lint.validation import engine
+
+    source = next(p for p in require_golden_normal if p.suffix.lower() == ".twbx")
+    baseline = {f.rule_id for f in engine.validate(source).findings}
+
+    for recipe in injector.RECIPES:
+        path = broken_set.get(recipe.id)
+        if path is None:
+            continue  # 이 표본에 해당 기능이 없다 — 주입 자체가 건너뛰어졌다
+        assert recipe.rule not in baseline, (
+            f"규칙 {recipe.rule}가 주입 전 원본에서도 울고 있다 — "
+            f"{recipe.id}의 검출을 이 규칙 덕으로 돌릴 수 없다"
+        )
+        found = {f.rule_id for f in engine.validate(path).findings}
+        assert recipe.rule in found, (
+            f"{recipe.id}를 규칙 {recipe.rule}가 놓쳤다 (잡힌 것: {sorted(found)})"
+        )
+
+
 def _xsd_errors(path: Path, schema: etree.XMLSchema) -> list[Any]:
     with zipfile.ZipFile(path) as zf:
         name = next(n for n in zf.namelist() if n.lower().endswith(".twb"))

@@ -171,6 +171,111 @@ def _r7_bad_enum(root: Any) -> str | None:
     return None
 
 
+# --- 2026-07-30 실측분 (MA_003 매출표가 연달아 낸 3층) ------------------------------
+# 한 파일을 고칠 때마다 다음 층이 드러났다. 레시피는 그 역순 — 정상본에서 한 층씩
+# 되돌린다. 근거는 docs/05-xsd-spike.md F5-b·F5-c·F5-d·F5-e.
+
+
+def _r15_drop_parameter_action_item(root: Any) -> str | None:
+    """R15 — `ParameterAction` 삭제. `<edit-parameter-action>`은 그대로 둔다."""
+    uses = any(
+        isinstance(el.tag, str) and fcp.strip_prefix(el.tag) == "edit-parameter-action"
+        for el in root.iter()
+    )
+    if not uses:
+        return None
+    return _drop_manifest_item(root, lambda tag: fcp.strip_prefix(tag) == "ParameterAction")
+
+
+def _r16_bare_member_literal(root: Any) -> str | None:
+    """R16 — `groupfilter@member`의 따옴표 제거 → 필터가 통째로 무시된다."""
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "groupfilter":
+            continue
+        member = el.get("member")
+        if not member or not (member.startswith('"') and member.endswith('"')):
+            continue
+        inner = member[1:-1]
+        if "].[" not in inner:
+            continue
+        el.set("member", inner)
+        return f"groupfilter member {member} → 따옴표 제거"
+    return None
+
+
+def _r17_unqualify_placeholder(root: Any) -> str | None:
+    """R17 — `[ds].[Multiple Values]`에서 한정자 제거 → 그 필드가 워크시트에서 빠진다."""
+    for el in root.iter():
+        if not isinstance(el.tag, str):
+            continue
+        column = el.get("column")
+        if column and column.endswith(".[Multiple Values]"):
+            el.set("column", "[Multiple Values]")
+            return f"{fcp.strip_prefix(el.tag)}@column {column} → 한정자 제거"
+        if el.text and el.text.strip().endswith(".[Multiple Values]"):
+            old = el.text.strip()
+            el.text = "[Multiple Values]"
+            return f"<{fcp.strip_prefix(el.tag)}> {old} → 한정자 제거"
+    return None
+
+
+def _r18_bare_parameter_ref(root: Any) -> str | None:
+    """R18 — 수식의 `[Parameters].[X]` → `[X]` → 계산필드가 오류 상태가 된다."""
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "calculation":
+            continue
+        formula = el.get("formula")
+        if not formula or "[Parameters].[" not in formula:
+            continue
+        el.set("formula", formula.replace("[Parameters].[", "["))
+        return "수식의 [Parameters]. 한정자 제거"
+    return None
+
+
+def _r19_unwrap_user_aggregation(root: Any) -> str | None:
+    """R19 — `usr:` 인스턴스로 올린 계산에서 바깥 집계를 벗긴다 → 시트가 비어 나온다."""
+    targets = {
+        (ci.get("column") or "").strip("[]")
+        for ci in root.iter()
+        if isinstance(ci.tag, str)
+        and fcp.strip_prefix(ci.tag) == "column-instance"
+        and ci.get("derivation") == "User"
+    }
+    for col in root.iter():
+        if not isinstance(col.tag, str) or fcp.strip_prefix(col.tag) != "column":
+            continue
+        if (col.get("name") or "").strip("[]") not in targets:
+            continue
+        calc = next(
+            (c for c in col if isinstance(c.tag, str) and fcp.strip_prefix(c.tag) == "calculation"),
+            None,
+        )
+        formula = calc.get("formula") if calc is not None else None
+        if not formula:
+            continue
+        for agg in ("MIN(", "MAX(", "SUM(", "AVG("):
+            if formula.startswith(agg) and formula.endswith(")"):
+                calc.set("formula", formula[len(agg):-1])
+                return f"{col.get('name')}의 바깥 {agg[:-1]}() 제거"
+    return None
+
+
+def _r20_empty_set(root: Any) -> str | None:
+    """R20 — 집합의 기반 필드를 지운다 → `… IN [집합]`을 쓰는 계산이 전부 깨진다."""
+    for group in root.iter():
+        if not isinstance(group.tag, str) or fcp.strip_prefix(group.tag) != "group":
+            continue
+        children = list(group)
+        if not children:
+            continue
+        for child in children:
+            group.remove(child)
+        placeholder = etree.SubElement(group, "groupfilter")
+        placeholder.set("function", "union")
+        return f"집합 '{group.get('name')}'의 기반 필드 제거 (빈 union만 남김)"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -213,6 +318,48 @@ RECIPES: tuple[Recipe, ...] = (
         expected="로드 거부 D2E8DA72 (value 'all' not in enumeration)",
         source="docs/06-rule-candidates.md R7 (함정 B10)",
         mutate=_r7_bad_enum,
+    ),
+    Recipe(
+        id="R15-drop-ParameterAction",
+        rule="manifest.gates",
+        expected="로드 거부 D2E8DA72: no declaration found for element 'edit-parameter-action'",
+        source="docs/05-xsd-spike.md F5-b (2026-07-30 실측)",
+        mutate=_r15_drop_parameter_action_item,
+    ),
+    Recipe(
+        id="R16-bare-member-literal",
+        rule="ref.notation",
+        expected="열림 + 경고: 필터를 구문 분석하는 동안 오류 — 필터를 무시합니다",
+        source="docs/05-xsd-spike.md F5-c",
+        mutate=_r16_bare_member_literal,
+    ),
+    Recipe(
+        id="R17-unqualified-placeholder",
+        rule="ref.notation",
+        expected="열림 + 경고: 이름이 '[Multiple Values]'인 필드가 없습니다 (필드 제거)",
+        source="docs/05-xsd-spike.md F5-c",
+        mutate=_r17_unqualify_placeholder,
+    ),
+    Recipe(
+        id="R18-bare-parameter-ref",
+        rule="ref.notation",
+        expected="열림 + 계산필드가 '계산에 오류 있음' → 종속 시트가 빈 화면",
+        source="docs/05-xsd-spike.md F5-d",
+        mutate=_r18_bare_parameter_ref,
+    ),
+    Recipe(
+        id="R19-unwrap-user-aggregation",
+        rule="calc.aggregation",
+        expected="열림 + '집계되지 않은 수식의 사용자 지정 집계가 필요합니다'",
+        source="docs/05-xsd-spike.md F5-e",
+        mutate=_r19_unwrap_user_aggregation,
+    ),
+    Recipe(
+        id="R20-empty-set",
+        rule="set.definition",
+        expected="열림 + 집합을 쓰는 계산이 전부 오류 상태",
+        source="docs/05-xsd-spike.md F5-e",
+        mutate=_r20_empty_set,
     ),
 )
 
