@@ -12,10 +12,13 @@ Tableau는 **로드는 하고 그 설정만 버린다**:
  — 이름이 '[Multiple Values]'인 필드가 없습니다.
 ```
 
-**둘 다 WARNING이다** (02 S1-6). 파일은 열린다 — 열리지 않는다고 확신할 때만 ERROR다.
+세 번째 표면은 수식이다 — 매개변수 참조에 `[Parameters].` 한정자가 없으면 계산필드가
+통째로 **오류 상태**가 되고 그 필드에 의존하는 시트가 빈 화면이 된다 (⑦-c).
+
+**전부 WARNING이다** (02 S1-6). 파일은 열린다 — 열리지 않는다고 확신할 때만 ERROR다.
 대신 조용하지 않다: 필터가 사라진 화면은 **틀린 숫자를 보여준다.**
 
-두 검사 모두 2026-07-30 MA_003 매출표 실측 + 실파일 61개 전수 상관이 근거다
+세 검사 모두 2026-07-30 MA_003 매출표 실측 + 실파일 61개 전수 상관이 근거다
 (docs/05-xsd-spike.md F5-c).
 """
 
@@ -24,13 +27,18 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from twb_lint.models import Finding, Severity
+from twb_lint import fieldref
+from twb_lint.calc.extractor import extract, formulas_in
+from twb_lint.models import Finding, Severity, WorkbookModel
 from twb_lint.validation.context import ValidationContext
 from twb_lint.validation.registry import register
 from twb_lint.validation.rule import RuleBase, Stage
 
 MAX_FINDINGS = 200
 """보고 상한. 자른 사실은 `note_partial`로 보고한다 (02 S5)."""
+
+PARAMETERS_DS = "Parameters"
+"""매개변수를 담는 인라인 데이터소스의 이름. 실측 61/61 파일에서 이 이름이다."""
 
 _QUALIFIED_REF = re.compile(r"^\[[^\[\]]+\]\.\[[^\[\]]+\]$")
 """`[ds].[field]` 하나만. 여러 참조가 이어진 값은 대상이 아니다."""
@@ -58,7 +66,11 @@ class RefNotationRule(RuleBase):
             ctx.note_skip(self.id, "트리를 파싱하지 못해 참조 표기를 검사하지 못했다")
             return []
 
-        findings = self._member_literals(ctx.raw_tree) + self._placeholders(ctx.raw_tree)
+        findings = (
+            self._member_literals(ctx.raw_tree)
+            + self._placeholders(ctx.raw_tree)
+            + self._bare_parameters(ctx)
+        )
         findings.sort(key=lambda f: (f.location, f.message))
         if len(findings) > MAX_FINDINGS:
             ctx.note_partial(
@@ -136,6 +148,66 @@ class RefNotationRule(RuleBase):
                     )
                 )
         return out
+
+
+    def _bare_parameters(self, ctx: ValidationContext) -> list[Finding]:
+        """⑦-c — 수식 안 매개변수 참조는 `[Parameters].[이름]`으로 한정해야 한다.
+
+        ```
+        DATE(DATEPARSE('yyyyMM', STR([P_YEAR]) + …))              계산에 오류 있음
+        DATE(DATEPARSE('yyyyMM', STR([Parameters].[P_YEAR]) + …)) 정상
+        ```
+
+        실파일 61개: 한정된 참조 3,377건 · 한정 없는 것은 **거부된 그 파일뿐**(36건).
+
+        ⚠️ **규칙 ②가 원리적으로 못 잡는다.** ②는 자격 없는 참조를 전 데이터소스 필드
+        합집합과 대조하므로(07 G5의 의도된 트레이드오프) `[P_YEAR]`가 Parameters에
+        있다는 이유로 해소된 것으로 본다. 여기서 그 거짓음성이 물었다.
+
+        이름이 **데이터 컬럼에도** 있으면 보고하지 않는다 — 매개변수를 가리킨다고
+        단정할 수 없다 (02 S1-6).
+        """
+        if ctx.raw_tree is None or PARAMETERS_DS not in ctx.model.datasources:
+            return []
+
+        params = ctx.model.field_names(PARAMETERS_DS)
+        data_fields = _fields_outside_parameters(ctx.model)
+        seen: set[str] = set()
+        out: list[Finding] = []
+        for el, formula in formulas_in(ctx.raw_tree):
+            for raw in sorted(extract(formula).field_refs):
+                for ref in fieldref.find_all(raw):
+                    if ref.datasource is not None:
+                        continue
+                    hit = next((n for n in ref.names if n in params), None)
+                    if hit is None or hit in data_fields or hit in seen:
+                        continue
+                    seen.add(hit)
+                    out.append(
+                        Finding(
+                            severity=Severity.WARNING,
+                            rule_id=self.id,
+                            location=_path_of(el),
+                            line=el.sourceline,
+                            message=(
+                                f"수식이 매개변수 `{hit}`를 한정자 없이 참조한다 — "
+                                "계산필드가 **오류 상태**가 되고 그 필드를 쓰는 시트가 "
+                                "빈 화면이 된다"
+                            ),
+                            fix=f"`[{PARAMETERS_DS}].[{hit}]`로 쓴다.",
+                        )
+                    )
+        return out
+
+
+def _fields_outside_parameters(model: WorkbookModel) -> set[str]:
+    """매개변수가 아닌 데이터소스들의 필드 이름 합집합."""
+    return {
+        name
+        for ds_name, ds in model.datasources.items()
+        if ds_name != PARAMETERS_DS
+        for name in ds.fields
+    }
 
 
 def _path_of(el: Any) -> str:

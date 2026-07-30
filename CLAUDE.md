@@ -6,7 +6,8 @@
 대상: Tableau **2026.1 단독 · 로컬 오프라인**.
 현 단계: **규칙 6종 가동** — io · L-A(XSD) · L-B 규칙 ①②③⑥⑦.
 정상본 **61개** ERROR 0 · 주입 6종 중 5종 차단(R1a는 의도적 WARNING).
-실사용 파일 실측으로 매니페스트 게이트 3쌍 + 규칙 ⑦(표기 규약)을 확보했다 (05 F5-b·F5-c).
+실사용 파일 실측으로 매니페스트 게이트 3쌍 + 규칙 ⑦(표기 규약 3종)을 확보했다
+(05 F5-b·F5-c·F5-d — 한 파일이 **로드 거부 → 설정 버려짐 → 데이터 안 나옴** 3층을 냈다).
 **남은 것은 사용자 라벨링 배치(TODO D1~D4)** — Tableau Desktop이 필요하다.
 진행 상황은 [`docs/impl-progress.md`](./docs/impl-progress.md)가 갖는다.
 
@@ -23,13 +24,13 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 184 passed, 13 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 187 passed, 13 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
 .venv/Scripts/python -m mypy             # Success: no issues in 54 source files
 ```
 
 하나라도 깨지면 커밋하지 않는다. 규칙을 구현했으면 **실파일 회귀**까지 —
-골든셋 경로를 환경변수로 걸면 `197 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
+골든셋 경로를 환경변수로 걸면 `200 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
 절차는 [`07-implementation-guide.md`](./docs/07-implementation-guide.md) §2.
 
 ```bash

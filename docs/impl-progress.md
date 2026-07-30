@@ -7,8 +7,8 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-30, 골든셋 걸고 실측): `197 passed` · `ruff All checks passed!`
-(골든셋 미설정 시 `184 passed, 13 skipped`)
+**현재** (2026-07-30, 골든셋 걸고 실측): `200 passed` · `ruff All checks passed!`
+(골든셋 미설정 시 `187 passed, 13 skipped`)
 
 > ⚠️ **mypy는 이 머신에서 실행이 차단됐다** (2026-07-30, `uv`와 같은 Smart App Control
 > 정책 — `mypy/ipc.py`의 base64 확장 로드 실패). 타입 검사가 게이트에서 빠져 있다.
@@ -93,9 +93,11 @@ Tableau Desktop 실행이 필요하다. 그것이 막는 것: 규칙 ⑥-a WARNI
 - [x] **4c. 게이트 3쌍 추가** (2026-07-30, 05 F5-b) — 실사용 파일 로드 거부를
       twb-lint가 놓친 것을 계기로 `computed-sort` · `edit-parameter-action` ·
       `clear-option`을 확보했다. 실파일 61개 전수 상관으로 쌍조건 확인 · ERROR 0 유지
-- [x] **4d. 규칙 ⑦ `ref.notation`** (2026-07-30, 05 F5-c · 06 R14) — 매니페스트를 고친
-      뒤 드러난 **두 번째 층**. ⑦-a 필터 member 따옴표 · ⑦-b `[Multiple Values]` 한정자.
-      둘 다 **WARNING**(열리지만 설정이 버려진다). 정상본 60개 0건 · 깨진 파일 16건
+- [x] **4d. 규칙 ⑦ `ref.notation`** (2026-07-30, 05 F5-c·F5-d · 06 R14) — 매니페스트를
+      고친 뒤 드러난 **2·3번째 층**. ⑦-a 필터 member 따옴표 · ⑦-b `[Multiple Values]`
+      한정자 · ⑦-c 수식 안 매개변수 `[Parameters].` 한정자.
+      셋 다 **WARNING**(열리지만 설정이 버려지거나 데이터가 안 나온다).
+      ⑦-c는 **규칙 ②가 원리적으로 못 잡는 자리**다 (07 G5 트레이드오프의 대가)
 
 ## 보류 (사람이 Tableau를 열어야 한다 — 루프가 건드리지 않는다)
 
@@ -123,4 +125,4 @@ Tableau Desktop 실행이 필요하다. 그것이 막는 것: 규칙 ⑥-a WARNI
 | 11 | 4a 규칙 ③ | 161 passed | 24 | 골든셋 ERROR 0 유지. **R2·R3가 게이트에서 막힌다** — L-A가 원리적으로 못 잡는 것을 L-B가 잡는 첫 실증. 남은 미검출은 R1a·R1b(규칙 ⑥) |
 | 12 | 4b 규칙 ⑥ | **170 passed** | 24 | R1b 차단. **주입 6종 중 5종을 게이트가 막는다**(R1a는 의도적 WARNING). 07 §4 1~4단계 완료 |
 | 13 | 4c 게이트 3쌍 추가 | **183 passed** | 24 | 실사용 파일(MA_003 매출표) 로드 거부를 놓친 것을 수정. 실파일 61개 회귀: 거부된 1개만 ERROR 3건(줄 750·773·1965 = Tableau 지목 줄), 나머지 60개 ERROR 0. 게이트 finding에 줄번호 추가. ⚠️ mypy는 이 머신에서 실행 차단됨(Smart App Control) |
-| 14 | 4d 규칙 ⑦ `ref.notation` | **184 passed** (골든셋 미설정) | 24 + 0 | 05 F5-c. 고친 사본이 열리자 나온 경고 2종을 규칙화. 정상본 60개 ref.notation 0건 · 깨진 파일 16건(member 14 + 자리표시자 2). 규칙 6종째, 코어 무수정 |
+| 14 | 4d 규칙 ⑦ `ref.notation` (⑦-a·b·c) | **187 passed** (골든셋 미설정) · 골든셋 `200 passed` | 24 + 0 | 05 F5-c·F5-d. 고친 사본이 열리자 층이 둘 더 나왔다 — 경고 2종(member 따옴표·자리표시자 한정자)과 "데이터가 안 나옴"(매개변수 한정자). 정상본 60개 ref.notation 0건. ⑦-c는 규칙 ②가 원리적으로 못 잡는 자리(07 G5). 규칙 6종째, 코어 무수정 |

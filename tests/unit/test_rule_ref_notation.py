@@ -8,10 +8,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 
-from tests.fixtures.builder import make_ctx, make_twb
+from tests.fixtures.builder import Calc, Ds, make_ctx, make_twb
 from twb_lint import fieldref
+from twb_lint import inspect as inspector
 from twb_lint.models import CoverageStatus, Severity
 from twb_lint.validation.semantic.ref_notation import RefNotationRule
 
@@ -22,6 +26,19 @@ BARE = "[federated.abc].[usr:C_실적:qk]"
 @pytest.fixture
 def rule() -> RefNotationRule:
     return RefNotationRule()
+
+
+def ctx_with_model(tmp_path: Path, xml: str) -> Any:
+    """모델까지 실제로 추출한 컨텍스트 — ⑦-c는 매개변수 집합이 입력이라 필요하다."""
+    src = tmp_path / "wb.twb"
+    src.write_text(xml, encoding="utf-8")
+    ctx, problems = inspector.load_context(src, tmp_path / "work")
+    assert problems == []
+    return ctx
+
+
+def param_findings(rule: RefNotationRule, ctx: Any) -> list[Any]:
+    return [f for f in rule.check(ctx) if "매개변수" in f.message]
 
 
 def test_bare_fieldref_member_is_a_warning(rule: RefNotationRule) -> None:
@@ -98,6 +115,53 @@ def test_qualified_placeholder_is_silent(rule: RefNotationRule) -> None:
     ctx = make_ctx(make_twb(extra_body="<rows>[federated.abc].[Multiple Values]</rows>"))
 
     assert rule.check(ctx) == []
+
+
+def _wb(formula: str, *, shared_name: bool = False) -> str:
+    name = "연도" if shared_name else "P_YEAR"
+    return make_twb(
+        datasources=(
+            Ds(name="Parameters", columns=(name,)),
+            Ds(
+                name="federated.abc",
+                columns=(("연도",) if shared_name else ("base_ym",)),
+                calcs=(Calc(name="C_P", formula=formula),),
+            ),
+        )
+    )
+
+
+def test_bare_parameter_reference_in_a_formula_is_a_warning(
+    rule: RefNotationRule, tmp_path: Path
+) -> None:
+    """⑦-c — `[P_YEAR]`는 계산필드를 통째로 오류 상태로 만든다 (실측).
+
+    정상본은 3,377건 전부 `[Parameters].[…]`로 한정돼 있다.
+    """
+    ctx = ctx_with_model(tmp_path, _wb("YEAR([base_ym]) = [P_YEAR]"))
+
+    findings = param_findings(rule, ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert "[Parameters].[P_YEAR]" in (findings[0].fix or "")
+    assert findings[0].line is not None
+
+
+def test_qualified_parameter_reference_is_silent(
+    rule: RefNotationRule, tmp_path: Path
+) -> None:
+    ctx = ctx_with_model(tmp_path, _wb("YEAR([base_ym]) = [Parameters].[P_YEAR]"))
+
+    assert param_findings(rule, ctx) == []
+
+
+def test_name_shared_with_a_data_column_is_not_reported(
+    rule: RefNotationRule, tmp_path: Path
+) -> None:
+    """같은 이름이 데이터 컬럼에도 있으면 매개변수를 가리킨다고 단정할 수 없다 (S1-6)."""
+    ctx = ctx_with_model(tmp_path, _wb("SUM([연도])", shared_name=True))
+
+    assert param_findings(rule, ctx) == []
 
 
 def test_placeholder_stays_excluded_from_field_matching() -> None:
