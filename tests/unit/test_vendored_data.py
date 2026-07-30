@@ -71,6 +71,22 @@ def test_manifest_gates_table_is_loadable() -> None:
     # 실측 쌍: manual-sort ↔ SortTagCleanup (05 F5)
     manual = next(g for g in data["gates"] if g["element"] == "manual-sort")
     assert manual["requires"] == ["SortTagCleanup"]
+    # 2026-07-30 실측분 (MA_003 매출표 로드 거부 D2E8DA72)
+    assert {"computed-sort", "edit-parameter-action", "clear-option"} <= elements
+    computed = next(g for g in data["gates"] if g["element"] == "computed-sort")
+    assert computed["requires"] == ["SortTagCleanup"], "sort 계열은 같은 항목이 게이팅한다"
+
+
+def test_every_gate_records_its_symptom_and_source() -> None:
+    """게이트는 ERROR를 낸다 — 근거 없는 항이 표에 들어오면 거짓 ERROR가 된다 (S1-6)."""
+    path = config.manifest_gates_path()
+    assert path is not None
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    for gate in data["gates"]:
+        assert gate["requires"], gate["element"]
+        assert gate["symptom"], gate["element"]
+        assert gate["source"], gate["element"]
 
 
 def test_unmapped_items_are_kept_separate_from_gates() -> None:

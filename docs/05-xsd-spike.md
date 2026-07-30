@@ -189,6 +189,82 @@ XSD_BY_VERSION = {"26.1": ..., "26.2": ...}   # 실제 파일은 "18.1"
 표본 간 차이도 이 규칙을 뒷받침한다 — 집합 액션을 쓰지 않는 260616 파일에는
 `GroupAction`/`GroupActionAddRemove`가 없다 (22개 vs 20개). 매니페스트는 **실제 사용 기능만** 나열한다.
 
+### F5-b. 2026-07-30 실측 — 게이트 3쌍 추가 확보 (MA_003 매출표)
+
+사용자가 만든 `MA_003_경영관리-재무-매출표_JWH_260729.twb`가 로드 거부됐다 (D2E8DA72):
+
+```
+Error(750,97):  no declaration found for element 'edit-parameter-action'
+Error(789,13):  element 'edit-parameter-action' is not allowed for content model
+                '(action,datasources,datasource-dependencies*,edit-group-action)'
+Error(1965,180): no declaration found for element 'computed-sort'
+Error(1977,16): element 'computed-sort' is not allowed for content model
+                '(datasources?,mapsources?,datasource-dependencies*,filter,sort,perspectives,slices?,aggregation)'
+```
+
+**twb-lint는 이 파일을 finding 0건으로 통과시켰다** — AC3 위반의 두 번째 실증.
+분석 결과 원인은 XSD도 자식 순서도 아니다:
+
+- 공식 XSD 2026.1.0은 두 요소를 **그 자리에서 허용한다**
+  (`ParameterActions-G`가 `ActionList-ActionList-CT`에 · `Sort-ComputedSort-G`가 `Sort-G`에)
+- `<actions>` 자식 순서도 정상본과 **완전히 동일**하다
+  (`edit-group-action`×2 → `edit-parameter-action`×2 = 정상본 MA_002와 같다)
+- 두 번째 거부 메시지의 content model이 F5의 `manual-sort` 사례와 **글자까지 같다** —
+  게이트가 닫힌 상태의 좁은 문법이다
+
+거부된 파일의 매니페스트 항목이 12개, 같은 기능을 쓰는 정상본은 22개였다.
+차이 중 이 파일이 실제로 쓰는 기능:
+
+| 없는 항목 | 파일이 쓰는 요소 | 거부 메시지 |
+|---|---|---|
+| `ParameterAction` | `<edit-parameter-action>` | 실측됨 |
+| `ParameterActionClearSelection` | `<clear-option>` | 부모만 실측됨 |
+| `SortTagCleanup` | `<computed-sort>` | 실측됨 |
+
+실파일 61개(KPMG·디딤 템플릿 39 + 사내 개발본 22) 전수 상관으로 쌍조건을 확인했다:
+
+| 요소 | 요소 있는 파일 | 항목 없는 예외 | 항목만 있고 요소 없는 파일 |
+|---|---|---|---|
+| `computed-sort` | 23 | 1 (거부된 그 파일) | 0 |
+| `edit-parameter-action` | 28 | 1 (같은 파일) | 0 |
+| `clear-option` | 28 | 1 (같은 파일) | 0 |
+
+`clear-option`은 출현 72회 전부 부모가 `edit-parameter-action`이고, 부모가 있으면 항상
+있었다 — 그래서 `ParameterActionClearSelection`을 부모가 아니라 `clear-option`에 걸었다.
+매개변수 액션에 `clear-option`이 없는 파일에 거짓 ERROR를 내지 않기 위한 선택이다.
+
+세 쌍을 `manifest_gates.json`에 넣은 뒤: 거부된 파일 = **ERROR 3건**(줄 750·773·1965,
+Tableau가 지목한 줄과 일치) · 정상본 61개 = **ERROR 0건**(AC7 유지).
+
+### F5-c. 게이트를 통과한 뒤 나온 두 번째 층 — 표기 규약 (같은 파일)
+
+매니페스트를 고친 사본은 **로드된다.** 대신 경고가 두 개 나왔다:
+
+```
+'SEC07_상세 실적표' 오류: '측정값 이름' 필드의 필터를 구문 분석하는 동안
+오류가 발생했습니다. 필터를 무시합니다.        (SEC06_추이도 같은 오류)
+
+'SEC06_추이' 워크시트에 오류가 있습니다. 다음이 제거됩니다.
+ — 이름이 '[Multiple Values]'인 필드가 없습니다.
+```
+
+**로드 거부와 성질이 다르다** — 파일은 열리고, Tableau가 **문제 있는 설정만 버린다.**
+필터가 사라진 화면은 조용히 틀린 숫자를 보여준다. 정상본 대조로 둘 다 표기 문제였다:
+
+| | 이 파일 | 정상본 | 정상본 실측 |
+|---|---|---|---|
+| `groupfilter@member` | `[ds].[usr:C_MTD_계획:qk]` | `"[ds].[usr:…:qk]"` | 감싼 것 714 · 안 감싼 것 0 |
+| 자리표시자 | `[Multiple Values]` | `[federated.…].[Multiple Values]` | 22개 파일 235회, 전부 한정자 있음 |
+
+`member`는 **값 자리**다 — 필드 참조를 값으로 쓸 때도 문자열 리터럴로 감싼다
+(`member='true'`는 불리언, `member='"SAMT"'`는 문자열, 필드 참조도 마찬가지).
+
+여기서 나온 규칙이 ⑦ `ref.notation`이다 (06 R14). **둘 다 WARNING** — S1-6에 따라
+"열리지 않는다고 확신할 때만 ERROR"이고, 이 둘은 열린다.
+
+**함의**: 매니페스트 게이트(F5)는 *로드 거부* 층이고, 표기 규약은 그 **뒤의 층**이다.
+한 층을 고치면 다음 층이 드러난다 — 게이트가 두 층을 다 봐야 "열리고 제대로 뜬다"를 말할 수 있다.
+
 ## F6. 부수 관측 — Tableau 설치본에 로더의 실제 XSD가 들어 있다
 
 `C:\Program Files\Tableau\Tableau 2026.1\bin\res\tablangres.rcc` (26MB, Qt 리소스)에

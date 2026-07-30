@@ -115,12 +115,21 @@ class ManifestGatesRule(RuleBase):
         """⑥-b — 대응표에 있는 요소를 쓰면서 필요한 항목을 빠뜨렸는가.
 
         **표에 있는 기능만 판정한다.** 표에 없는 요소를 추측해 ERROR를 내지 않는다
-        (02 S1-6). 확보분은 2쌍뿐이고, 나머지는 `known_items_unmapped`로 보고한다.
+        (02 S1-6). 나머지는 `known_items_unmapped`로 보고한다.
+
+        요소당 finding 1건이다 — 같은 요소가 수십 번 나와도 고칠 곳은 매니페스트 1군데다.
+        대신 **첫 출현 줄번호**를 싣는다: Tableau의 거부 메시지가 줄 기준이라 대조가 된다.
         """
-        used = {fcp.strip_prefix(el.tag) for el in root.iter() if isinstance(el.tag, str)}
+        first_line: dict[str, int | None] = {}
+        for el in root.iter():
+            if not isinstance(el.tag, str):
+                continue
+            tag = fcp.strip_prefix(el.tag)
+            if tag not in first_line:
+                first_line[tag] = getattr(el, "sourceline", None)
         out: list[Finding] = []
         for element, requires, symptom in load_gates(gates_path):
-            if element not in used:
+            if element not in first_line:
                 continue
             missing = [item for item in requires if item not in declared]
             if not missing:
@@ -130,6 +139,7 @@ class ManifestGatesRule(RuleBase):
                     severity=Severity.ERROR,
                     rule_id=self.id,
                     location=element,
+                    line=first_line[element],
                     message=(
                         f"`<{element}>`를 쓰면서 매니페스트 항목 {', '.join(missing)}을(를) "
                         f"선언하지 않았다 — 로드 거부: {symptom}"

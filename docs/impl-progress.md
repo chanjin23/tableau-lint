@@ -7,9 +7,11 @@
 > 고치고 여기엔 링크만 남긴다. 구현 순서의 근거는
 > [`07-implementation-guide.md`](./07-implementation-guide.md) §4.
 
-**현재** (2026-07-29, 골든셋 걸고 실측): `170 passed` ·
-`ruff All checks passed!` · `mypy Success: no issues found in 54 source files`
-(골든셋 미설정 시 `157 passed, 13 skipped`)
+**현재** (2026-07-30, 골든셋 걸고 실측): `197 passed` · `ruff All checks passed!`
+(골든셋 미설정 시 `184 passed, 13 skipped`)
+
+> ⚠️ **mypy는 이 머신에서 실행이 차단됐다** (2026-07-30, `uv`와 같은 Smart App Control
+> 정책 — `mypy/ipc.py`의 base64 확장 로드 실패). 타입 검사가 게이트에서 빠져 있다.
 
 ## 🏁 07 §4의 1~4단계 전부 완료
 
@@ -85,9 +87,15 @@ Tableau Desktop 실행이 필요하다. 그것이 막는 것: 규칙 ⑥-a WARNI
       근거다. 배치되지 않은 시트는 보고하지 않는다(정상이다).
       **주입본 R2·R3가 이제 게이트에서 막힌다 — AC3 무거짓통과의 해소 실증**
 - [x] **4b. 규칙 ⑥** — ⑥-a fcp(`ctx.raw_tree`, **WARNING** — 인과 미검증) ·
-      ⑥-b 대응표 2쌍(**ERROR** — 로드 거부 메시지 실측).
-      매핑을 모르는 항목 16종은 `note_partial`로 "검사하지 못했다"를 보고한다.
+      ⑥-b 대응표 5쌍(**ERROR** — 로드 거부 메시지 실측).
+      매핑을 모르는 항목 14종은 `note_partial`로 "검사하지 못했다"를 보고한다.
       **주입본 R1b가 게이트에서 막힌다**
+- [x] **4c. 게이트 3쌍 추가** (2026-07-30, 05 F5-b) — 실사용 파일 로드 거부를
+      twb-lint가 놓친 것을 계기로 `computed-sort` · `edit-parameter-action` ·
+      `clear-option`을 확보했다. 실파일 61개 전수 상관으로 쌍조건 확인 · ERROR 0 유지
+- [x] **4d. 규칙 ⑦ `ref.notation`** (2026-07-30, 05 F5-c · 06 R14) — 매니페스트를 고친
+      뒤 드러난 **두 번째 층**. ⑦-a 필터 member 따옴표 · ⑦-b `[Multiple Values]` 한정자.
+      둘 다 **WARNING**(열리지만 설정이 버려진다). 정상본 60개 0건 · 깨진 파일 16건
 
 ## 보류 (사람이 Tableau를 열어야 한다 — 루프가 건드리지 않는다)
 
@@ -114,3 +122,5 @@ Tableau Desktop 실행이 필요하다. 그것이 막는 것: 규칙 ⑥-a WARNI
 | 10 | 3d 규칙 ② | 153 passed | **24** | 골든셋 ERROR 0 · WARNING 24(파일당 1~6). 전부 실제 잔재 참조이며 D3.6.3 예측과 일치. 3단계 완료 |
 | 11 | 4a 규칙 ③ | 161 passed | 24 | 골든셋 ERROR 0 유지. **R2·R3가 게이트에서 막힌다** — L-A가 원리적으로 못 잡는 것을 L-B가 잡는 첫 실증. 남은 미검출은 R1a·R1b(규칙 ⑥) |
 | 12 | 4b 규칙 ⑥ | **170 passed** | 24 | R1b 차단. **주입 6종 중 5종을 게이트가 막는다**(R1a는 의도적 WARNING). 07 §4 1~4단계 완료 |
+| 13 | 4c 게이트 3쌍 추가 | **183 passed** | 24 | 실사용 파일(MA_003 매출표) 로드 거부를 놓친 것을 수정. 실파일 61개 회귀: 거부된 1개만 ERROR 3건(줄 750·773·1965 = Tableau 지목 줄), 나머지 60개 ERROR 0. 게이트 finding에 줄번호 추가. ⚠️ mypy는 이 머신에서 실행 차단됨(Smart App Control) |
+| 14 | 4d 규칙 ⑦ `ref.notation` | **184 passed** (골든셋 미설정) | 24 + 0 | 05 F5-c. 고친 사본이 열리자 나온 경고 2종을 규칙화. 정상본 60개 ref.notation 0건 · 깨진 파일 16건(member 14 + 자리표시자 2). 규칙 6종째, 코어 무수정 |

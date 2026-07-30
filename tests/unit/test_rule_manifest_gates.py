@@ -51,6 +51,38 @@ def test_table_gate_violation_is_an_error(rule: ManifestGatesRule) -> None:
     assert "SortTagCleanup" in findings[0].message
 
 
+@pytest.mark.parametrize(
+    ("element", "item"),
+    [
+        ("computed-sort", "SortTagCleanup"),
+        ("edit-parameter-action", "ParameterAction"),
+        ("clear-option", "ParameterActionClearSelection"),
+    ],
+)
+def test_gates_measured_on_2026_07_30(rule: ManifestGatesRule, element: str, item: str) -> None:
+    """2026-07-30 실측분 — MA_003 매출표가 이 3건으로 로드 거부됐다 (D2E8DA72).
+
+    거부 메시지는 `edit-parameter-action`·`computed-sort`만 지목했지만
+    `clear-option`도 같은 계열이라 표에 넣었다 (근거는 manifest_gates.json의 source).
+    """
+    ctx = make_ctx(make_twb(extra_body=f"<{element} />"))
+
+    findings = [f for f in rule.check(ctx) if f.location == element]
+
+    assert [f.severity for f in findings] == [Severity.ERROR]
+    assert item in findings[0].message
+
+
+def test_gate_finding_carries_the_first_occurrence_line(rule: ManifestGatesRule) -> None:
+    """Tableau 거부 메시지가 줄 기준이라 대조가 되려면 줄번호가 있어야 한다."""
+    ctx = make_ctx(make_twb(extra_body="<manual-sort />\n<manual-sort />"))
+
+    findings = [f for f in rule.check(ctx) if f.location == "manual-sort"]
+
+    assert len(findings) == 1, "요소가 여러 번 나와도 고칠 곳은 매니페스트 1군데다"
+    assert findings[0].line is not None
+
+
 def test_table_gate_satisfied_is_silent(rule: ManifestGatesRule) -> None:
     ctx = make_ctx(make_twb(manifest=("SortTagCleanup",), extra_body="<manual-sort />"))
 
@@ -76,7 +108,7 @@ def test_elements_outside_the_table_are_not_guessed(rule: ManifestGatesRule) -> 
 
 
 def test_unmapped_items_are_reported_as_partial_coverage(rule: ManifestGatesRule) -> None:
-    """이름만 알고 매핑을 모르는 항목 16종은 **검사할 수 없다** — 그 사실을 보고한다."""
+    """이름만 알고 매핑을 모르는 항목 14종은 **검사할 수 없다** — 그 사실을 보고한다."""
     ctx = make_ctx(make_twb())
 
     rule.check(ctx)
