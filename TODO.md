@@ -14,23 +14,29 @@
 
 | | 요구 | 상태 |
 |---|---|---|
-| **T1** | 파일이 무조건 열린다 | ✅ 가동 |
-| **T2** | 워크시트의 계산필드·매개변수가 오류를 내지 않는다 | 🟡 부분 |
-| **T3** | 집합·동작을 걸 때 오류가 나지 않는다 | 🟡 집합만 |
-| **T4** | 페이지·필터·마크·열·행에 올릴 때 오류가 나지 않는다 | ❌ 없음 |
+| **T1** | 파일이 무조건 열린다 | ✅ **저작 4종 4/4 열림** (2026-07-31 실측) |
+| **T2** | 워크시트의 계산필드·매개변수가 오류를 내지 않는다 | 🟡 부분 — 집계 수준(R23)이 빠졌다 |
+| **T3** | 집합·동작을 걸 때 오류가 나지 않는다 | 🟡 참조만 — **모양·배선(R20~R22)이 빠졌다** |
+| **T4** | 페이지·필터·마크·열·행에 올릴 때 오류가 나지 않는다 | 🟡 T4-a만 |
 
-현 규칙 8종의 담당:
+현 규칙 10종의 담당:
 
 | 규칙 id | 담당 | 심각도 |
 |---|---|---|
+| `input.readable` | 층 0 — 입력 | ERROR |
 | `xsd.schema` (L-A) | T1 | ERROR/WARNING 혼합 |
-| `named.refs` | T1 — zone·worksheet·viewpoint 3자 일치 | ERROR |
+| `named.refs` | T1 — zone·worksheet·viewpoint·window 4자 일치 | ERROR |
 | `manifest.gates` | T1 — 매니페스트 게이트 | ⑥-b ERROR / ⑥-a WARNING |
-| `ref.notation` | T1·T2 — 표기 정합, 매개변수 한정자 | ERROR/WARNING |
+| `ref.notation` | T1·T2 — 표기 정합 (⑦-a·b·c·**d**) | ERROR/WARNING |
 | `calc.functions` | T2 — 함수 화이트리스트 | WARNING |
 | `calc.field_refs` | T2 — dangling 참조 | WARNING |
 | `calc.aggregation` | T2 — 사용자 지정 집계 | WARNING |
-| `set.definition` | T3 — 집합 정의 | — |
+| `set.definition` | T3 — 집합 정의 | WARNING |
+| `action.refs` | T3 — 동작 배선 참조 | WARNING |
+| `shelf.refs` | T4-a — 선반 배치 참조 | WARNING |
+
+**T1은 지키는데 층 2~4는 1/8만 잡는다** (05 F5-g 실측). 저작 3종을 열어 찾은
+결함 7건 중 린터가 잡은 건 0건이고, 앞 반복에서 규칙화한 ⑦-d 1건만 잡혔다.
 
 ---
 
@@ -66,6 +72,25 @@
 - [ ] **R⑫ `calc.types` — T2 타입 정합**
       문자열↔숫자 혼합 · 집계와 비집계 인자 혼합(`SUM([A]) + [B]`) · `IF` 분기 반환형 불일치.
       **WARNING 기조로 시작한다** — 타입 추론이 불완전한 채 ERROR를 내면 AC7이 깨진다
+      - ⚠️ 시제품 실측이 실파일에서 **혼합 0건**을 냈다. 잡을 게 없는 규칙을 만들기 전에
+        `inject_defects.py`에 `SUM([A]) + [B]` 레시피를 먼저 넣어 검출 가치를 세운다
+      - **R23(집계 수준)을 여기 넣을지 먼저 정한다** — 뷰 그레인 계산이 필요해 성격이 다르다
+
+### 2-1. `/defect-loop` 대기열 — 실측 끝, 구현 전
+
+저작 2차(A·B·C)가 낸 결함을 실측까지 마쳐 후보로 박아 뒀다.
+**근거는 `docs/06-rule-candidates.md` R20~R24 · `docs/05-xsd-spike.md` F5-g.**
+한 반복에 하나씩, `/defect-loop`으로 돈다.
+
+| 순서 | 후보 | 확장할 규칙 | 실측 (정상 : 반례) | 층 |
+|---|---|---|---|---|
+| **D1** | 동작 명령·param 화이트리스트 + `<link>` 누락 | ⑩ `action.refs` | `tsl-filter 14`·`brush 16` : `filter 0` · param `target 30`/`exclude 29` : `source-field 0` · link `14 : 0` | 2 |
+| **D2** | 집합 모양(`auto-column='sets'`)과 놓인 자리(인코딩) | ⑨ `set.definition` | `ui-builder 46 : auto-column 2`(둘 다 거부된 파일) · `filter 38 : 인코딩 0` | 2 |
+| **D3** | 집계 수준 정합 (인코딩의 행수준 차원) | ⑫ `calc.types` 또는 신규 | 뷰 그레인 계산 방법 미정 | 4 |
+| — | `<pages>`의 `<current-page>` | — | **표본 0 — 규칙화하지 않는다** (R24) | 3 |
+
+**D1을 먼저 한다.** 반례 0이고 표면이 열거형이라 화이트리스트로 바로 간다.
+D3은 뷰 그레인을 정적으로 구할 수 있는지부터 정해야 하므로 마지막이다.
 
 ### 3. 자잘한 것
 
@@ -113,7 +138,7 @@
 ## 검증 파이프라인
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 205 passed, 14 skipped (골든셋 미설정 시 / 걸면 219)
+.venv/Scripts/python -m pytest -q     # 254 passed, 14 skipped (골든셋 미설정 시 / 걸면 268)
 .venv/Scripts/python -m ruff check .  # All checks passed
 ```
 
@@ -121,4 +146,5 @@
 
 ## 다음 한 걸음
 
-**P1.** 문제정의를 먼저 갈아엎는다 — 규칙을 붙이기 전에 무엇을 판정하는지가 바뀌었다.
+**D1.** `/defect-loop` — 동작 명령·param 화이트리스트 (§2-1).
+실측은 끝났다. 반례 0이라 바로 규칙으로 간다.

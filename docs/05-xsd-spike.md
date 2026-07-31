@@ -366,6 +366,71 @@ Tableau가 써 둔 표기를 그대로 두므로 이 층이 드러나지 않는�
 
 규칙 ⑦-d가 여기서 나왔다. **WARNING** — 파일은 열린다.
 
+### F5-g. 저작 3종을 열어 본 결과 — 검출률 1/8 (2026-07-31)
+
+F5-f 이후 `/author-loop`으로 워크북 3개를 더 만들어 Tableau에서 열었다.
+케이스를 겹치지 않게 나눴다 — **A** 매개변수 동작·LOD, **B** 집합·정렬·필터 동작,
+**C** 데이터소스 2개·페이지 선반·참조선.
+
+**셋 다 열렸다.** 층 1은 린터가 지켰다 — 저작 중 XSD가 6건을 막았다
+(`<group>`을 워크시트 의존성에 배치 · `layout`의 없는 속성 2 · `label` 인코딩 ·
+`manual-sort@direction` 누락 · `reference-line` 필수 속성 2).
+
+그런데 **화면은 틀려 있었다.** 사용자가 Tableau에서 찾아낸 결함 7건을 각각 되돌려
+넣고 린터를 다시 태운 결과:
+
+| | 결함 | 층 | 린터 |
+|---|---|---|---|
+| ① | `groupfilter@level` 한정자 (F5-f) | 2 | ✅ `ref.notation` |
+| ② | `<group>`에 `user:auto-column='sets'` | 2 | ❌ |
+| ③ | 집합을 `<encodings><color>`에 배치 | 2 | ❌ |
+| ④ | `command='tsc:filter'` — 존재하지 않는 명령 | 2 | ❌ |
+| ⑤ | `param name='source-field'` — 존재하지 않는 param | 2 | ❌ |
+| ⑥ | 필터 동작에 `<link expression>` 누락 | 2 | ❌ |
+| ⑦ | 도구 설명에 행수준 차원 (집계 수준 불일치) | 4 | ❌ |
+| ⑧ | `<pages>`에 `<current-page>` 누락 | 3 | ❌ |
+
+**1/8.** 잡은 하나는 바로 앞 반복에서 규칙화한 ⑦-d다.
+
+#### 대조 수치 (전부 반례 0)
+
+| 축 | 정상본 | 저작본이 쓴 것 |
+|---|---|---|
+| `<group>` 속성 | `user:ui-builder='filter-group'` **46** | `user:auto-column='sets'` — **2건뿐이고 둘 다 MA_003(거부된 파일)** |
+| 집합이 놓이는 자리 | `<filter>` **38** | `<encodings>` — **0** |
+| 동작 `command` | `tsc:tsl-filter` **14** · `tsc:brush` **16** | `tsc:filter` — **0** |
+| 동작 `param name` | `target` **30** · `exclude` **29** · `field-captions` **15** · `special-fields` 1 | `source-field` — **0** |
+| 필터 동작의 필드 매핑 | `<link expression='tsl:…'>` — tsl-filter **14건 전부** | 없음 |
+| `column-instance@derivation` | `None` 3487 · `User` 2412 · `Sum` 409 · `Min` 209 · `Month` 55 · `Count` 29 · `Year` 2 · `Month-Trunc` 1 | `Attribute` — **실파일 0건** |
+| `<pages>` | **0회** | — |
+
+#### 여기서 배운 것
+
+**1. 필드 매핑이 param이 아니라 URL에 들어 있다.** 필터 동작의 원본↔대상 필드는
+`<command>`의 자식이 아니라 `<link expression>`에 퍼센트 인코딩되어 실린다:
+
+```
+tsl:<대시보드>?<필드>~s0=&lt;<필드>~na&gt;
+```
+
+이걸 빼면 Tableau의 동작 대화상자에 항목은 뜨는데 **필드 열이 비고 편집 버튼이 죽는다.**
+`target`도 시트가 아니라 **대시보드** 이름이고, `exclude`는 *필터를 적용하지 않을* 시트다.
+
+**2. 기존 규칙이 왜 비켜갔는지가 규칙 설계의 근거다.**
+
+| | 있는 규칙 | 왜 못 잡나 |
+|---|---|---|
+| ②③ | ⑨ `set.definition` | *"기반 필드가 있는가"*만 본다. 모양과 놓인 자리는 안 본다 |
+| ④⑤⑥ | ⑩ `action.refs` | *"가리키는 대상이 실재하는가"*만 본다. **명령·param 이름 자체는 안 본다** — 오타든 없는 값이든 통과 |
+| ⑦ | ⑫ `calc.types` | 미구현 |
+| ⑧ | — | 표본 0. 규칙화 조건 미달 |
+
+**3. `derivation='Attribute'`는 근거가 약하다.** 실파일 0건이고 XSD의 `AggType-ST`는
+**제약 없는 문자열**이다. 접두사 규칙의 일관성(`Sum→sum:`·`Count→cnt:`·`Month→mn:`)과
+Tableau UI의 `특성(담당자)` 표시만이 근거다. 규칙화하지 않는다.
+
+후보 항목은 `docs/06-rule-candidates.md` **R20~R23**.
+
 ### F5 정리 — 실사용 파일이 낸 4층 + 저작이 낸 1층
 
 | 층 | 증상 | 규칙 | 심각도 | 실측 근거 |
