@@ -15,11 +15,16 @@ Tableau는 **로드는 하고 그 설정만 버린다**:
 세 번째 표면은 수식이다 — 매개변수 참조에 `[Parameters].` 한정자가 없으면 계산필드가
 통째로 **오류 상태**가 되고 그 필드에 의존하는 시트가 빈 화면이 된다 (⑦-c).
 
+네 번째는 **한정자를 붙여서** 틀리는 자리다 — `groupfilter@level` (⑦-d). ⑦-b와 방향이
+반대라는 것이 이 규칙의 요점이다: 자리마다 한정 여부가 정해져 있고, 어느 쪽이든
+어기면 그 설정이 버려진다.
+
 **전부 WARNING이다** (02 S1-6). 파일은 열린다 — 열리지 않는다고 확신할 때만 ERROR다.
 대신 조용하지 않다: 필터가 사라진 화면은 **틀린 숫자를 보여준다.**
 
-세 검사 모두 2026-07-30 MA_003 매출표 실측 + 실파일 61개 전수 상관이 근거다
-(docs/05-xsd-spike.md F5-c).
+⑦-a·b·c는 2026-07-30 MA_003 매출표 실측 + 실파일 61개 전수 상관이 근거다
+(docs/05-xsd-spike.md F5-c). ⑦-d는 2026-07-31 `/author-loop`이 만든 신규 워크북이
+근거다 (F5-f) — 우리가 직접 저작하기 전에는 이 자리를 틀릴 일이 없어서 안 보였다.
 """
 
 from __future__ import annotations
@@ -42,6 +47,13 @@ PARAMETERS_DS = "Parameters"
 
 _QUALIFIED_REF = re.compile(r"^\[[^\[\]]+\]\.\[[^\[\]]+\]$")
 """`[ds].[field]` 하나만. 여러 참조가 이어진 값은 대상이 아니다."""
+
+_HAS_DS_PREFIX = re.compile(r"^\[[^\[\]]+\]\.\[")
+"""데이터소스 한정자로 **시작하는가**. 뒤가 몇 조각이든 상관하지 않는다.
+
+`_QUALIFIED_REF`와 달리 전체 일치를 요구하지 않는다 — `[ds].[a].[b]` 같은 값도
+한정된 것으로 봐야 하는데, 그런 모양이 정상본에 없다고 검사에서 빠뜨리면
+바로 그 모양이 규칙의 구멍이 된다."""
 
 BARE_PLACEHOLDER = "[Multiple Values]"
 """데이터소스 한정자가 없는 자리표시자 표기.
@@ -69,6 +81,7 @@ class RefNotationRule(RuleBase):
         findings = (
             self._member_literals(ctx.raw_tree)
             + self._placeholders(ctx.raw_tree)
+            + self._qualified_levels(ctx.raw_tree)
             + self._bare_parameters(ctx)
         )
         findings.sort(key=lambda f: (f.location, f.message))
@@ -149,6 +162,56 @@ class RefNotationRule(RuleBase):
                 )
         return out
 
+
+    def _qualified_levels(self, root: Any) -> list[Finding]:
+        """⑦-d — `groupfilter@level`에는 데이터소스 한정자를 붙이지 않는다.
+
+        ⑦-b와 **방향이 반대다.** 자리표시자는 한정자를 붙여야 하고, `level`은 붙이면
+        안 된다. 같은 필드가 같은 필터 안에서 두 표기로 나타난다:
+
+        ```xml
+        <filter class='categorical' column='[federated.abc].[none:C_등급:nk]'>
+          <groupfilter function='member' level='[none:C_등급:nk]' member='"고액"' />
+        </filter>
+        ```
+
+        붙이면 Tableau가 로드하면서 경고하고 **그 필터를 통째로 버린다**:
+
+        ```
+        '매출 추이' 오류: 필터링을 위해 포함된
+        '[federated.0d2m1o5x3q7k9w1e5r8t2y4u6i].[none:Calculation_…:nk]' 필드가 없습니다.
+        ```
+
+        실측 (2026-07-31, 실파일 85개 중 이 요소를 쓰는 31개):
+        **비한정 3,484건 : 한정 0건.**
+
+        더 강한 성질 — *"level은 `filter@column`의 기저 이름과 같다"* — 은 **실측이
+        부정했다**: `column='[ds].[Action (C_팀명)]'`에 `level='[팀명(복사본)_…]'`인
+        정상 사례가 있다. 남는 불변식은 한정자 유무 하나뿐이라 그것만 본다.
+
+        `level`이 없는 `groupfilter`(`function='union'` 같은 묶음 노드) 430건은
+        대상이 아니다.
+        """
+        out: list[Finding] = []
+        for el in root.iter("groupfilter"):
+            value = el.get("level")
+            if value is None or not _HAS_DS_PREFIX.match(value):
+                continue
+            bare = value.split("].", 1)[1]
+            out.append(
+                Finding(
+                    severity=Severity.WARNING,
+                    rule_id=self.id,
+                    location=_path_of(el),
+                    line=el.sourceline,
+                    message=(
+                        f"필터 level `{value}`에 데이터소스 한정자가 붙었다 — "
+                        "Tableau가 그 필드를 찾지 못하고 **필터를 버린다**"
+                    ),
+                    fix=f"한정자를 뗀다: `level='{bare}'`.",
+                )
+            )
+        return out
 
     def _bare_parameters(self, ctx: ValidationContext) -> list[Finding]:
         """⑦-c — 수식 안 매개변수 참조는 `[Parameters].[이름]`으로 한정해야 한다.

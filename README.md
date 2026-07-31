@@ -39,7 +39,7 @@ twb-lint = 공식 XSD(A) 위에 **(B) 시맨틱 검증기**를 얹은 것.
 | io (unpack·parse·모델 추출·pack) | ✅ `.hyper` 라운드트립 바이트 동일성(AC8) 통과 |
 | L-A 구문 (vendored XSD) | ✅ 컴파일 캐시 + 심각도 등급. 정상본 61/61 통과 |
 | L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪ | ✅ 전부 가동 |
-| 테스트 | ✅ 3층 (스모크 / 규칙 계약·단위 / 골든셋) — **246 passed, 14 skipped** (골든셋 걸면 260) |
+| 테스트 | ✅ 3층 (스모크 / 규칙 계약·단위 / 골든셋) — **254 passed, 14 skipped** (골든셋 걸면 268) |
 | 라벨 확정 | ⏸ 사용자 배치 대기 (Tableau Desktop 필요 — `TODO.md` L1~L3) |
 
 **판정 대상 4항목** (`docs/01-problem-definition.md` §4):

@@ -276,6 +276,30 @@ def _r20_empty_set(root: Any) -> str | None:
     return None
 
 
+def _r21_qualify_filter_level(root: Any) -> str | None:
+    """R21 — `groupfilter@level`에 한정자를 붙인다 → 필터가 통째로 버려진다.
+
+    한정자는 감싸는 `<filter>`의 `column`에서 가져온다 — 지어내면 그 필터가
+    원래 어느 데이터소스였는지와 무관한 값이 되어 다른 결함이 섞인다.
+    """
+    for filt in root.iter():
+        if not isinstance(filt.tag, str) or fcp.strip_prefix(filt.tag) != "filter":
+            continue
+        column = filt.get("column") or ""
+        if "]." not in column or not column.startswith("["):
+            continue
+        prefix = column.split("].", 1)[0] + "]."
+        for gf in filt.iter():
+            if not isinstance(gf.tag, str) or fcp.strip_prefix(gf.tag) != "groupfilter":
+                continue
+            level = gf.get("level")
+            if not level or not level.startswith("[") or level.startswith(prefix):
+                continue
+            gf.set("level", prefix + level)
+            return f"groupfilter@level {level} → {prefix}{level}"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -346,6 +370,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + 계산필드가 '계산에 오류 있음' → 종속 시트가 빈 화면",
         source="docs/05-xsd-spike.md F5-d",
         mutate=_r18_bare_parameter_ref,
+    ),
+    Recipe(
+        id="R21-qualify-filter-level",
+        rule="ref.notation",
+        expected="열림 + 경고: 필터링을 위해 포함된 '[ds].[…]' 필드가 없습니다 (필터 제거)",
+        source="docs/05-xsd-spike.md F5-f (2026-07-31 /author-loop 실측)",
+        mutate=_r21_qualify_filter_level,
     ),
     Recipe(
         id="R19-unwrap-user-aggregation",

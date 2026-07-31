@@ -172,6 +172,60 @@ def test_placeholder_stays_excluded_from_field_matching() -> None:
     assert "Multiple Values" in fieldref.SPECIAL_NAMES
 
 
+def _filter(level: str, member: str = "&quot;고액&quot;") -> str:
+    return (
+        "<filter class='categorical' column='[federated.abc].[none:C_등급:nk]'>"
+        f"<groupfilter function='member' level='{level}' member='{member}' />"
+        "</filter>"
+    )
+
+
+def test_qualified_filter_level_is_a_warning(rule: RefNotationRule) -> None:
+    """실측 3,484 : 0. 한정자를 붙이면 Tableau가 필터를 버린다 (05 F5-f)."""
+    ctx = make_ctx(make_twb(extra_body=_filter("[federated.abc].[none:C_등급:nk]")))
+
+    findings = rule.check(ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert "한정자가 붙었다" in findings[0].message
+    assert "level='[none:C_등급:nk]'" in findings[0].fix
+    assert findings[0].line is not None
+
+
+def test_unqualified_filter_level_is_silent(rule: RefNotationRule) -> None:
+    """정상 모양. 3,484건이 전부 이것이다."""
+    assert rule.check(make_ctx(make_twb(extra_body=_filter("[none:C_등급:nk]")))) == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            "<filter class='categorical'>"
+            "<groupfilter function='union'>"
+            f"<groupfilter function='member' level='[:Measure Names]' member='{QUOTED}' />"
+            "</groupfilter></filter>",
+            id="level 없는 묶음 노드 + 한정된 member는 ⑦-a의 자리다",
+        ),
+        pytest.param(
+            _filter("[:Measure Names]", member="&quot;SAMT&quot;"),
+            id="내장 자리표시자 level은 한정되지 않는다",
+        ),
+        pytest.param(
+            "<filter class='categorical' column='[federated.abc].[none:팀명:nk]'>"
+            "<groupfilter function='level-members' level='[팀명(복사본)_0435408457822213]' />"
+            "</filter>",
+            id="level이 column의 기저 이름과 달라도 정상이다 (실측 반례)",
+        ),
+    ],
+)
+def test_lookalike_levels_are_not_reported(rule: RefNotationRule, body: str) -> None:
+    """거짓양성 함정 — 비슷하지만 정상인 모양들. 여기서 뱉으면 AC7이 무너진다."""
+    findings = rule.check(make_ctx(make_twb(extra_body=body)))
+
+    assert [f for f in findings if "level" in f.message] == []
+
+
 def test_missing_tree_reports_the_skip(rule: RefNotationRule) -> None:
     ctx = make_ctx(make_twb())
     ctx.raw_tree = None
