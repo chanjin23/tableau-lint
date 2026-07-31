@@ -224,6 +224,81 @@
   속성 이름을 열거하면 새 모양이 나올 때마다 거짓양성이 난다
 - **원천**: 2026-07-30 실측 (05 F5-e)
 
+### R17. 동작(`<actions>`) 배선 끊김 [L-B · **구현됨 = rule ⑩**]
+
+- **증상**: 파일은 열린다. 그 동작이 발동하지 않거나, 대상 필드·집합이 오류 상태가 된다
+- **왜 XSD가 못 잡나**: 배선의 절반이 `<param name= value= />`에 실리는데 XSD에서
+  이 둘은 **임의 문자열 쌍**이다. 없는 `target-parameter`를 넣어도 L-A는 통과한다
+- **표면 9종** (실측 2026-07-31, 실파일 84개 중 `<actions>` 보유 33개):
+
+  | 표면 | 대조 대상 | 해소 : 미해소 |
+  |---|---|---|
+  | `source@worksheet` | 워크시트 | 81 : 0 |
+  | `source@dashboard` | 대시보드 | 153 : 0 |
+  | `source@datasource` | 데이터소스(이름 ∪ caption) | 4 : 0 |
+  | `exclude-sheet@name` | 시트 ∪ 대시보드 | 3,016 : 0 |
+  | `param exclude` (콤마 목록) | 시트 ∪ 대시보드 | 979 : 0 |
+  | `param target` | 시트 ∪ 대시보드 | 30 : 0 |
+  | `param target-group` | 집합 이름 ∪ 필드 | 46 : 0 |
+  | `param target-parameter` 한정자 | `[Parameters].` | 83 : 0 |
+  | `param target-parameter` 대상 | Parameters의 필드 | 77 : **6** |
+  | `param source-field` | 전 데이터소스 필드 | 75 : **4** |
+
+- **심각도: 전부 WARNING.** R2·R3(규칙 ③)가 ERROR인 것과 대비된다 — 저쪽은
+  *viewpoint 누락 = 2805CF18*이라는 **로드 거부 실측**이 있었다. 동작 배선에는 없다.
+  반례 10건이 오히려 반대를 시사한다:
+  - `target-parameter` 6건 — `[Parameters].[ColorStart]`인데 그 파일 `Parameters`에는
+    `매개 변수 1~6`뿐. **진짜 dangling**이고 골든셋 밖 파일(`old/`)이다
+  - `source-field` 4건 — 가리키는 이름이 `groupfilter@level`에만 있고 `<column>`·
+    `<column-instance>` 어디에도 없다. 규칙 ②의 **잔재 dangling과 같은 계열**이며
+    **골든셋 파일 1개가 여기 포함된다** → 이 표면은 ERROR가 될 수 없다
+- **`<actions>` 안의 `<datasources>`·`<datasource-dependencies>`는 동작이 아니다** —
+  동작이 참조하는 필드 정의의 사본이다(84개 중 3개 파일). 배선으로 읽으면 통째로 오탐
+- **같은 결함을 여러 번 말하지 않는다** — `exclude-sheet`는 파일당 수백 번 나온다.
+  (표면, 값)으로 합치고 등장 횟수를 메시지에 적는다
+- **콤마 목록을 무조건 쪼개지 않는다** — 통째로 해소되면 그대로 둔다. 실측 1,460개
+  시트·대시보드 이름에 콤마는 없었지만 금지된 것은 아니다
+- **원천**: 01 v2.0 §4 T3 · 2026-07-31 전수 실측
+
+### R18. 선반 배치 참조 끊김 [L-B · **구현됨 = rule ⑪**]
+
+사용자가 **페이지·필터·마크·열·행**에 올린 것이 실재하는 필드인가 (01 v2.0 §4 T4-a).
+끊기면 파일은 열리되 그 필드가 워크시트에서 제거되거나 오류 상태로 뜬다.
+
+- **규칙 ②와 자리가 다르다.** ②는 `REFERENCE_SURFACES` 9자리만 본다. 선반은 그 밖에
+  있었다 — 마크 인코딩의 `color`·`size`·`tooltip`, 열·행의 **요소 텍스트**,
+  필터의 `<slices>/<column>`, 정렬·축 계열이 무주공산이었다
+- **실측** (2026-07-31, 실파일 84개 전수. ②가 이미 보는 자리는 뺐다):
+
+  | 표면 | 해소 : 미해소 |
+  |---|---|
+  | `<slices>/<column>` (필터 선반) | 2,462 : 0 |
+  | `groupfilter@level` (필터) | 2,553 : 0 |
+  | `<cols>` (열 선반, 텍스트) | 445 : **10** |
+  | `<rows>` (행 선반, 텍스트) | 445 : **6** |
+  | `tooltip`·`color`·`size`@column (마크) | 871 : 0 |
+  | `computed-sort`·`manual-sort`·`sort`·`alphabetic-sort`·`shelf-sort-v2` | 429 : 0 |
+  | `pane@x-axis-name` · `@y-axis-name` | 140 : **12** |
+  | `reference-line`·`label-data`·`order`·`table-calc@ordering-field` | 17 : 0 |
+  | `<pages>/<column>` (페이지 선반) | **실측 0회** |
+
+- **심각도: WARNING.** 반례 28건이 전부 골든셋 파일 하나(`태블로판차분석`)에서 나왔고
+  그 파일은 열린다 — `Calculation_0630847643873281`·`Calculation_2012107314806786`을
+  열·행·축이 가리키는데 데이터소스 어디에도 없다. ②의 잔재 dangling과 같은 계열이다
+- **`<pages>`는 실측 0회인데도 넣었다. 근거는 추측이 아니라 공식 XSD다** —
+  내용 모델이 `<column>` 자식 목록이고 타입이 `QualifiedName-ST`로, 실측 2,462:0인
+  `<slices>/<column>`과 같은 구조다 (`twb_2026.1.0.xsd:5497`)
+- **보지 않는 것**: `<dictionary>/<bucket>`(그룹·집합의 **값** 목록, 반례 172건) ·
+  `<formatted-text>/<run>`(텍스트 서식 **본문**, 반례 34건) ·
+  `<datasource-dependencies>` 하위(정의 사본) · ②가 이미 보는 9자리
+- **T4-b(어떤 필드를 어떤 선반에 놓으면 오류인가)는 여기 없다** — 정답지가 없다
+  (01 v2.0 §7 · `TODO.md` L1)
+- **부수 산물: `fieldref` 다층 장식 결함**을 이 스캔이 드러냈다.
+  `[pcto:sum:값:qk]`·`[cum:usr:LinPack_…]`처럼 장식이 **겹쳐 붙는데** 한 겹만
+  벗기고 있었다. 벗겨지지 않을 때까지 반복하도록 고쳤고, 반례가 48 → 28로 줄었다.
+  규칙 ②의 거짓 dangling도 같은 만큼 준다
+- **원천**: 01 v2.0 §4 T4-a · 2026-07-31 전수 실측
+
 ---
 
 ## C. 정적 검증 불가 — 범위 밖 (명시적으로 표기)
