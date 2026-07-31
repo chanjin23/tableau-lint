@@ -87,3 +87,33 @@ def test_find_all_reads_every_ref_in_a_string() -> None:
 def test_non_reference_text_yields_nothing() -> None:
     assert fieldref.parse("not a ref") is None
     assert fieldref.find_all("SUM(1 + 2)") == []
+
+
+def test_stacked_decorations_are_peeled_all_the_way() -> None:
+    """장식은 겹쳐 붙는다 (2026-07-31 실측, 규칙 ⑪ 스캔에서 드러났다).
+
+    한 겹만 벗기면 `sum:값`이 남아 대조에 실패한다 — 실파일에서 이것이
+    `pane@x-axis-name`·`tooltip@column` 등의 거짓 dangling 수십 건을 만들고 있었다.
+    """
+    stacked = fieldref.parse("[federated.abc].[pcto:sum:값:qk]")
+
+    assert stacked is not None
+    assert stacked.names[0] == "값"
+    assert "sum:값" in stacked.names
+    assert stacked.names[-1] == "pcto:sum:값:qk", "원문은 항상 후보에 남는다"
+
+
+def test_a_role_prefix_without_a_kind_suffix_is_also_peeled() -> None:
+    """접미(`:qk`) 없이 역할만 붙는 자리가 실재한다 (실측 `[cum:usr:LinPack_…]`)."""
+    ref = fieldref.parse("[federated.abc].[cum:usr:LinPack_0172558392640620]")
+
+    assert ref is not None
+    assert ref.names[0] == "LinPack_0172558392640620"
+
+
+def test_peeling_only_ever_adds_candidates() -> None:
+    """후보는 더하기만 한다 — 원문이 사라지면 이름이 그렇게 생긴 필드가 dangling이 된다."""
+    for text in ("[a].[b]", "[a].[usr:b:qk]", "[a].[x:y:z:nk]"):
+        ref = fieldref.parse(text)
+        assert ref is not None
+        assert ref.names[-1] == text.split("].[")[1][:-1]

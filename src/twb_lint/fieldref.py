@@ -49,6 +49,14 @@ _DECORATED = re.compile(r"^(?P<role>[a-z]{1,8}):(?P<inner>.+):(?P<kind>[a-z]{2})
 꼬리의 `:숫자`는 같은 필드를 여러 번 올렸을 때 붙는 인스턴스 번호다
 (`usr:Calculation_1476…:qk:3` — 실측). 이름의 일부가 아니다."""
 
+_LEADING_ROLE = re.compile(r"^[a-z]{1,8}:")
+"""역할 접두 한 겹. 접미(`:qk`)가 **없는** 형태를 위한 것이다 — `cum:usr:LinPack_017…`
+처럼 누계 접두만 붙고 종류 접미가 안 붙는 자리가 실재한다 (실측, `pane@y-axis-name`)."""
+
+_MAX_DECORATION_LAYERS = 4
+"""장식을 벗기는 최대 횟수. 실측 최대는 2겹(`pcto:sum:값:qk`)이고, 상한은 무한 루프
+방지용이다 — 이름 자체가 `a:b:c:d:…`인 필드에서 멈추지 않는 것을 막는다."""
+
 REFERENCE_SURFACES = (
     ("column-instance", "column"),
     ("column-instance", "name"),
@@ -141,11 +149,33 @@ def _candidates(name: str) -> tuple[str, ...]:
 
     원문을 남기는 이유: 필드 이름 자체가 `abc:xyz:nk`처럼 생겼을 수 있다.
     벗긴 것만 남기면 그 필드가 dangling이 된다.
+
+    **장식은 겹쳐 붙는다** (2026-07-31 실측, 규칙 ⑪ 스캔에서 드러났다):
+
+    ```
+    [pcto:sum:값:qk]                 총계 대비 비율 × 합계 — 실제 이름은 `값`
+    [cum:usr:LinPack_0172558392640620]   누계 × 사용자 지정 집계 — 접미가 아예 없다
+    ```
+
+    한 겹만 벗기면 `sum:값`이 남아 대조에 실패한다. 그래서 **더 벗겨지지 않을 때까지**
+    반복하고, 접미(`:qk`) 없이 역할만 붙은 형태도 후보에 넣는다.
+
+    후보는 **더하기만 한다** — 하나라도 맞으면 해소로 본다. 그래서 이 확장이 틀리는
+    방향은 거짓양성(정상 파일을 막는다)이 아니라 거짓음성(진짜 dangling을 놓친다)이다.
+    AC7이 AC2보다 앞선다 (02 S1-6).
     """
-    m = _DECORATED.match(name)
-    if m is None:
-        return (name,)
-    return (m.group("inner"), name)
+    seen = [name]
+    current = name
+    for _ in range(_MAX_DECORATION_LAYERS):
+        m = _DECORATED.match(current)
+        stripped = m.group("inner") if m else _LEADING_ROLE.sub("", current, count=1)
+        if stripped == current or not stripped:
+            break
+        current = stripped
+        if current not in seen:
+            seen.append(current)
+    # 좁은 것(가장 많이 벗긴 것) → 넓은 것(원문) 순으로 되돌린다.
+    return tuple(reversed(seen))
 
 
 def _special_reason(datasource: str | None, name: str) -> str | None:
