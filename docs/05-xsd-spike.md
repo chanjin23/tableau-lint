@@ -384,9 +384,9 @@ F5-f 이후 `/author-loop`으로 워크북 3개를 더 만들어 Tableau에서 �
 | ① | `groupfilter@level` 한정자 (F5-f) | 2 | ✅ `ref.notation` |
 | ② | `<group>`에 `user:auto-column='sets'` | 2 | ❌ |
 | ③ | 집합을 `<encodings><color>`에 배치 | 2 | ❌ |
-| ④ | `command='tsc:filter'` — 존재하지 않는 명령 | 2 | ❌ |
-| ⑤ | `param name='source-field'` — 존재하지 않는 param | 2 | ❌ |
-| ⑥ | 필터 동작에 `<link expression>` 누락 | 2 | ❌ |
+| ④ | `command='tsc:filter'` — 관측되지 않은 명령 | 2 | ❌ → ✅ ⑬ (F5-h) |
+| ⑤ | `param name='source-field'` — **자리가 틀린** param | 2 | ❌ → ✅ ⑬ (F5-h) |
+| ⑥ | 필터 동작에 `<link expression>` 누락 | 2 | ❌ → ✅ ⑬ (F5-h) |
 | ⑦ | 도구 설명에 행수준 차원 (집계 수준 불일치) | 4 | ❌ |
 | ⑧ | `<pages>`에 `<current-page>` 누락 | 3 | ❌ |
 
@@ -398,8 +398,8 @@ F5-f 이후 `/author-loop`으로 워크북 3개를 더 만들어 Tableau에서 �
 |---|---|---|
 | `<group>` 속성 | `user:ui-builder='filter-group'` **46** | `user:auto-column='sets'` — **2건뿐이고 둘 다 MA_003(거부된 파일)** |
 | 집합이 놓이는 자리 | `<filter>` **38** | `<encodings>` — **0** |
-| 동작 `command` | `tsc:tsl-filter` **14** · `tsc:brush` **16** | `tsc:filter` — **0** |
-| 동작 `param name` | `target` **30** · `exclude` **29** · `field-captions` **15** · `special-fields` 1 | `source-field` — **0** |
+| 동작 `command` ⚠️ | `tsc:tsl-filter` **14** · `tsc:brush` **16** | `tsc:filter` — **0** |
+| 동작 `param name` ⚠️ | `target` **30** · `exclude` **29** · `field-captions` **15** · `special-fields` 1 | `source-field` — **0** |
 | 필터 동작의 필드 매핑 | `<link expression='tsl:…'>` — tsl-filter **14건 전부** | 없음 |
 | `column-instance@derivation` | `None` 3487 · `User` 2412 · `Sum` 409 · `Min` 209 · `Month` 55 · `Count` 29 · `Year` 2 · `Month-Trunc` 1 | `Attribute` — **실파일 0건** |
 | `<pages>` | **0회** | — |
@@ -431,7 +431,77 @@ Tableau UI의 `특성(담당자)` 표시만이 근거다. 규칙화하지 않는
 
 후보 항목은 `docs/06-rule-candidates.md` **R20~R23**.
 
-### F5 정리 — 실사용 파일이 낸 4층 + 저작이 낸 1층
+> ⚠️ 위 표의 동작 두 줄(`command`·`param name`)에는 **내 저작본이 섞여 있었다.**
+> 정정된 수치는 F5-h에 있다. 결론(반례 0)은 바뀌지 않지만 `source-field`에 대한
+> 판단은 **뒤집혔다** — "존재하지 않는 이름"이 아니라 "자리가 틀린 이름"이다.
+
+### F5-h. `/defect-loop` D1 — 동작의 모양은 셋뿐이다 (2026-07-31, 규칙 ⑬)
+
+F5-g의 결함 ④⑤⑥을 한 규칙으로 묶었다. 셋 다 **같은 층·같은 요소·같은 증상**이다 —
+파일은 경고 없이 열리는데 동작 대화상자에서 편집이 막히고 동작이 발동하지 않는다.
+
+#### 먼저 실측을 다시 했다
+
+F5-g의 글롭 `C:\dev\*.twbx`가 **내가 만든 저작본을 정상본으로 셌다.** 갈라서 다시 센다
+(실파일 63개 · 동작 140건, 저작본 제외):
+
+| 종류 | 명령 | `<link>` | 건수 |
+|---|---|---|---|
+| `<action>` 필터 | `tsc:tsl-filter` | 있다 (`expression='tsl:…'`) | **14 : 0** |
+| `<action>` 하이라이트 | `tsc:brush` | 없다 | **17 : 0** |
+| `<action>` URL | 없다 | 있다 (`expression='http…'`) | **1** |
+| `<edit-parameter-action>` | 없다 | 없다 | 75 |
+| `<edit-group-action>` | 없다 | 없다 | 47 |
+| `<nav-action>` | — | — | **0 — 표본 없음** |
+
+`<action>`은 **세 모양뿐이고 명령과 `<link>`가 짝을 이룬다.** 저작본의
+`tsc:filter` + `<link>` 없음은 셋 중 어디에도 없다.
+
+param 이름은 **종류마다 어휘가 갈린다. 교차 0건:**
+
+| 종류 | 관측된 param 이름 |
+|---|---|
+| `action` / `tsc:tsl-filter` | `target` 14 · `exclude` 14 |
+| `action` / `tsc:brush` | `target` 17 · `exclude` 16 · `field-captions` 16 · `special-fields` 1 |
+| `edit-parameter-action` | `target-parameter` 75 · `source-field` **70** |
+| `edit-group-action` | `selection-clear-set-option` 47 · `target-group` 47 |
+
+**F5-g가 틀렸던 지점이 여기다.** `source-field`는 없는 이름이 아니라 **70건 관측되는
+정상 이름**이고, 저작본은 그걸 `<action>`에 붙였다. 전역 화이트리스트로는 못 잡는다 —
+종류별로 갈라야 걸린다. 거짓양성 함정 테스트가 이 한 쌍을 고정한다.
+
+#### XSD는 원리적으로 못 잡는다
+
+```xml
+<xs:simpleType name="ActionList-CommandName-ST">
+  <xs:restriction base="xs:string"><xs:pattern value="[^:]+:[^:]+"/></xs:restriction>
+</xs:simpleType>
+```
+
+**열거가 아니라 패턴이다.** `tsc:filter`도 `아무거나:아무거나`도 통과한다. `<param>`은
+`name`·`value` 둘 다 `xs:string`이다. L-A가 볼 수 있는 것이 없다.
+
+#### 규칙 ⑬ `action.shape` — ⑩과 무엇이 다른가
+
+⑩ `action.refs`는 *가리키는 대상이 실재하는가*(**참조**), ⑬은 *Tableau가 아는 배선
+모양인가*(**어휘**)를 본다. 저작본은 가리키는 시트·필드가 전부 실재해서 ⑩이 침묵했다.
+그래서 ⑩ 확장이 아니라 **별도 규칙**으로 냈다 — 같은 id 아래 두면 "refs"가 아닌 것이
+`action.refs`로 보고된다.
+
+**전부 WARNING이다.** 목록이 좁아서다 — 명령 2종·param 8종이 표본의 전부고,
+`<nav-action>`은 어휘 자체를 모른다(→ `note_partial`). 목록 밖은 *틀렸다*가 아니라
+*모른다*이므로 ERROR가 될 수 없다 (02 S1-6). 규칙 ①(`calc.functions`)과 같은 구조다.
+그리고 층 2다 — `tsc:filter`를 넣은 저작본을 Tableau가 **경고 없이** 열었다.
+
+#### 회귀
+
+- 실파일 63개 `action.shape` **0건** (AC7 유지, 총 ERROR 0)
+- 결함 파일 `매출요약.twbx` 1건만 검출
+- 주입 레시피 2건 추가 — `R22-unknown-action-command` · `R23-drop-filter-link`.
+  둘 다 주입 전 baseline 0, 주입 후 검출
+- 게이트 **285 passed** (골든셋) / 271 passed, 14 skipped (미설정)
+
+### F5 정리 — 실사용 파일이 낸 4층 + 저작이 낸 2층
 
 | 층 | 증상 | 규칙 | 심각도 | 실측 근거 |
 |---|---|---|---|---|
@@ -440,6 +510,7 @@ Tableau UI의 `특성(담당자)` 표시만이 근거다. 규칙화하지 않는
 | 표기(매개변수) | 열리되 데이터가 안 나옴 | ⑦-c | WARNING | 3,377:0 |
 | 집계·집합 | 열리되 필드가 오류 상태 | ⑧·⑨ | WARNING | 20:0 · 82:0 |
 | 표기(필터 level) | 열리되 필터가 버려짐 | **⑦-d** | WARNING | **3,484:0** (F5-f) |
+| 동작 모양 | 열리되 동작이 안 먹음 | **⑬** | WARNING | 14:0 · 17:0 · 어휘 교차 0 (F5-h) |
 
 **층은 순서대로만 보인다.** 앞 층을 고치기 전에는 뒤 층의 증상이 나타나지 않는다 —
 Tableau가 첫 실패에서 멈추기 때문이다. 그래서 한 반복에 한 층만 고친다

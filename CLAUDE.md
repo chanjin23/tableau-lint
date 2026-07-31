@@ -5,7 +5,7 @@
 **"열었을 때 빨간 느낌표가 없는가"**를 판정한다.
 
 대상: Tableau **2026.1 단독 · 로컬 오프라인**.
-현 단계: **규칙 10종 가동** — io · L-A(XSD) · L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪.
+현 단계: **규칙 11종 가동** — io · L-A(XSD) · L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪⑬.
 정상본 **61개** ERROR 0 · 주입 6종 중 5종 차단(R1a는 의도적 WARNING).
 
 **2026-07-31 문제정의 재설정 (01 v2.0)** — 위험은 *편집*이 아니라 **생성**에 있다.
@@ -27,20 +27,20 @@
 | **프로젝트 정보** | [`docs/tableau-ai-sor.md`](./docs/tableau-ai-sor.md) — SOR 인덱스. 여기서 시작 |
 | **무엇을 판정하는가** | [`docs/01-problem-definition.md`](./docs/01-problem-definition.md) **v2.0** — T1~T4 · 실패 4층 |
 | **구현 시 필수** | [`docs/07-implementation-guide.md`](./docs/07-implementation-guide.md) — G1~G10 함정 · 검증 파이프라인 · 관례 |
-| **지금 할 일** | [`TODO.md`](./TODO.md) — 규칙 ⑫. 라벨링 배치(L)는 블로커에서 강등됐다 |
+| **지금 할 일** | [`TODO.md`](./TODO.md) — `/defect-loop` D2 · 규칙 ⑫. 라벨링 배치(L)는 블로커에서 강등됐다 |
 
 `docs/`가 권위 문서다. 이 파일과 어긋나면 **`docs/` 우선.**
 
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 254 passed, 14 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 271 passed, 14 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
 .venv/Scripts/python -m mypy             # Success: no issues in 54 source files
 ```
 
 하나라도 깨지면 커밋하지 않는다. 규칙을 구현했으면 **실파일 회귀**까지 —
-골든셋 경로를 환경변수로 걸면 `268 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
+골든셋 경로를 환경변수로 걸면 `285 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
 절차는 [`07-implementation-guide.md`](./docs/07-implementation-guide.md) §2.
 
 ```bash
@@ -68,7 +68,7 @@ export TWB_LINT_GOLDEN_NORMAL='<정상본 glob>;<glob>;...'   # ';' 구분, 미�
   파서는 `io.safety.make_parser()`로만 만든다 — 기본 파서는 엔티티를 해석한다(XXE)
 - **검사 못 했으면 말한다** — `ctx.note_skip()`. 빈 리스트를 조용히 반환하면
   "전부 검사했고 문제없음"으로 기록된다
-- 새 규칙 = `validation/semantic/` 파일 1개 + `@register`. 코어 무수정 (현재 10규칙).
+- 새 규칙 = `validation/semantic/` 파일 1개 + `@register`. 코어 무수정 (현재 11규칙).
   계약 테스트가 새 규칙도 자동으로 잡는다
 - findings 정렬은 **엔진이 보장**한다(`stage→rule_id→line→location`). 규칙은 반환 순서를 신경 쓰지 않는다
 - 테스트 입력은 `tests/fixtures`의 `make_twb()`/`make_ctx()`로. 1MB 실파일로 디버깅하지 않는다

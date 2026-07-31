@@ -107,7 +107,7 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 
 ## 규칙 카탈로그 — 이 린터가 실제로 내는 `rule_id`
 
-**진단에 나오는 것은 아래 11개뿐이다.** 없는 rule id를 지어내지 않는다.
+**진단에 나오는 것은 아래 12개뿐이다.** 없는 rule id를 지어내지 않는다.
 
 | `rule_id` | 담당 층 | 심각도 | 무엇을 잡나 |
 |---|---|---|---|
@@ -120,7 +120,8 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 | `calc.field_refs` | 3 | WARNING | dangling 필드 참조 |
 | `calc.aggregation` | 4 | WARNING | `derivation="User"`로 올린 계산에 집계가 없음 |
 | `set.definition` | 4 | WARNING | 집합에 기반 필드가 없음 |
-| `action.refs` | 2·4 | WARNING | 동작 배선 — 소스 시트·대상 매개변수·집합·필드 |
+| `action.refs` | 2·4 | WARNING | 동작 배선 **참조** — 소스 시트·대상 매개변수·집합·필드 |
+| `action.shape` | 2 | WARNING | 동작 배선 **어휘** — 명령·param 이름·`<link>` 짝 |
 | `shelf.refs` | 2·4 | WARNING | **선반 배치** — 페이지·필터·마크·열·행·정렬·축의 참조 |
 
 ### 진단별 수정 지침
@@ -180,13 +181,28 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 - `[:Measure Names]`·`[Multiple Values]`는 필드가 아니라 내장 자리표시자다.
   다만 **데이터소스 한정자는 붙인다** (`ref.notation` ⑦-b)
 
-**`set.definition` / `action.refs` — 집합과 동작**
+**`set.definition` / `action.refs` / `action.shape` — 집합과 동작**
 
 - 집합에는 **기반 필드**가 있어야 한다 (`groupfilter@member` 또는 중첩 `@level`).
   없으면 `… IN [X 집합]`을 쓰는 계산이 **전부** 깨진다
 - 동작의 `source@worksheet`/`@dashboard`는 caption이 아니라 **실제 `name`과 글자 단위 일치**
 - 동작이 가리키는 **대상 매개변수·대상 집합·원본 필드가 실재**하는지 확인 후 연결한다
 - 필터 동작의 매핑 필드는 양쪽 `datatype`이 같아야 한다. 다르면 변환용 계산 필드를 먼저
+- **`<action>`은 세 모양뿐이다** (실측 63파일). 명령과 `<link>`가 짝을 이룬다:
+
+  | 종류 | 명령 | `<link>` |
+  |---|---|---|
+  | 필터 | `tsc:tsl-filter` | **필수** — `expression='tsl:<대시보드>?<필드>~s0=&lt;<필드>~na&gt;'` |
+  | 하이라이트 | `tsc:brush` | 없다 |
+  | URL | 없다 | `expression='http…'` |
+
+- **필터 동작의 필드 매핑은 param이 아니라 `<link expression>`에 있다.** 대시보드·필드
+  이름을 퍼센트 인코딩해 URL로 싣는다. 빼면 동작 대화상자의 필드 열이 빈다
+- **param 이름은 동작 종류마다 어휘가 다르다.** 같은 이름을 다른 자리에 쓰면 버려진다:
+  `<action>`은 `target`·`exclude`(+brush는 `field-captions`·`special-fields`),
+  `<edit-parameter-action>`은 `target-parameter`·`source-field`,
+  `<edit-group-action>`은 `target-group`·`selection-clear-set-option`
+- 필터 동작의 `target`은 시트가 아니라 **대시보드**고, `exclude`는 *적용하지 않을* 시트다
 
 ---
 
@@ -246,6 +262,6 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 - **ERROR 0만 보고 PASS 선언하기** — 층 2~4는 WARNING이다
 - 규칙 비활성화·예외 처리·suppress로 통과시키기
 - 진단 메시지를 요약해서 넘기기 — `rule_id`와 `location`을 그대로 보고한다
-- **없는 `rule_id`를 지어내기** — 위 카탈로그 11개가 전부다
+- **없는 `rule_id`를 지어내기** — 위 카탈로그 12개가 전부다
 - 린터가 보지 않는 것을 "PASS"에 포함시키기 — 범위 밖은 ④에 따로 적는다
 - 필드명·스키마를 지어내기 — 불확실하면 `twb_inspect`로 확인하고, 그래도 모르면 묻는다

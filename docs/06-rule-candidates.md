@@ -352,26 +352,22 @@
 - **심각도 후보: WARNING** (층 2). 둘 다 반례 0이지만 파일은 열린다
 - **원천**: 05 F5-g · 2026-07-31 저작 B안
 
-### R21. 동작의 명령·param 이름 화이트리스트 [L-B · **미구현** — 규칙 ⑩ 확장]
+### R21+R22. 동작의 모양 — 명령·param 어휘·`<link>` 짝 [L-B · **구현됨 = 규칙 ⑬ `action.shape`**]
 
-규칙 ⑩ `action.refs`는 *"가리키는 시트·매개변수·집합·필드가 실재하는가"*를 본다.
-**명령과 param 이름 자체는 안 본다** — 지어낸 값이 그대로 통과한다.
+두 후보를 하나로 냈다. **같은 요소·같은 층·같은 증상**이다 — 파일은 경고 없이 열리는데
+동작 대화상자에서 편집이 막히고 동작이 발동하지 않는다.
 
-| 축 | 실파일 | 저작본 |
-|---|---|---|
-| `<command @command>` | `tsc:tsl-filter` **14** · `tsc:brush` **16** | `tsc:filter` — **0** |
-| `<param @name>` | `target` **30** · `exclude` **29** · `field-captions` **15** · `special-fields` **1** | `source-field` — **0** |
+규칙 ⑩ `action.refs`는 *"가리키는 시트·매개변수·집합·필드가 실재하는가"*(**참조**)를 본다.
+⑬은 *"Tableau가 아는 배선 모양인가"*(**어휘**)를 본다. 저작본은 가리키는 대상이 전부
+실재해서 ⑩이 침묵했다 — 그래서 ⑩ 확장이 아니라 **별도 규칙**이다.
 
-증상: 동작 대화상자에 항목은 뜨는데 **필드 열이 비고 편집 버튼이 죽는다.** 동작이 안 먹는다.
+**`<action>`은 세 모양뿐이고, 명령과 `<link>`가 짝을 이룬다** (실파일 63개 · 동작 140건):
 
-- **모양이 아니라 성질로 잡을 수 있는가**: 없다. 명령·param 이름은 열거형이다.
-  그래서 **화이트리스트 + "목록 밖은 WARNING"**이 맞다 — 릴리스가 늘리면 목록을 늘린다.
-  `calc.functions`(⑦-a 아님, 규칙 ①)와 같은 구조다: 우리 목록이 불완전할 수 있으므로 ERROR가 아니다
-- **원천**: 05 F5-g · 2026-07-31 저작 B안
-
-### R22. 필터 동작의 `<link expression>` 누락 [L-B · **미구현** — 규칙 ⑩ 확장]
-
-**필터 동작의 원본↔대상 필드 매핑은 `<command>`의 param이 아니라 `<link>`에 있다.**
+| 종류 | 명령 | `<link>` | 건수 |
+|---|---|---|---|
+| 필터 | `tsc:tsl-filter` | 있다 — `expression='tsl:…'`에 필드 매핑이 실린다 | **14 : 0** |
+| 하이라이트 | `tsc:brush` | 없다 | **17 : 0** |
+| URL | 없다 | 있다 — `expression='http…'` | **1** |
 
 ```xml
 <link caption='제품 필터' delimiter=',' escape='\'
@@ -379,13 +375,29 @@
       include-null='true' multi-select='true' url-escape='true' />
 ```
 
-대시보드 이름과 필드가 퍼센트 인코딩되어 URL에 실린다. 실측: `tsc:tsl-filter`를 쓰는
-동작 **14건 전부** `<link>`를 갖는다. 반례 0.
+param 이름은 **종류마다 어휘가 갈린다. 교차 0건:**
 
-- **R21과 붙여서 하나로 구현할 수 있다** — 둘 다 `<action>` 배선의 같은 층이다
-- ⑩이 `<link expression>` 안의 필드도 대조하게 확장하면 **참조 무결성 축도 같이 넓어진다**
-  (지금은 이 자리의 필드를 아무도 안 본다)
-- **원천**: 05 F5-g
+| 종류 | 관측된 param 이름 |
+|---|---|
+| `action` / `tsc:tsl-filter` | `target` 14 · `exclude` 14 |
+| `action` / `tsc:brush` | `target` 17 · `exclude` 16 · `field-captions` 16 · `special-fields` 1 |
+| `edit-parameter-action` | `target-parameter` 75 · `source-field` **70** |
+| `edit-group-action` | `selection-clear-set-option` 47 · `target-group` 47 |
+
+> **F5-g의 수치가 정정됐다.** 그 표는 내 저작본을 정상본으로 셌다. `source-field`는
+> **없는 이름이 아니라 70건 관측되는 정상 이름**이고, 저작본이 그걸 `<action>`에 붙인
+> 것이 결함이었다. 전역 화이트리스트로는 못 잡는다 — 종류별로 갈라야 걸린다.
+
+- **모양이 아니라 성질로 잡을 수 있는가**: 명령·param 이름은 열거형이라 없다.
+  **화이트리스트 + "목록 밖은 WARNING"**이 맞다 — 규칙 ①(`calc.functions`)과 같은 구조다:
+  우리 목록이 불완전할 수 있으므로 ERROR가 아니다
+- **XSD가 못 잡는 이유**: `ActionList-CommandName-ST`가 `<xs:pattern value="[^:]+:[^:]+"/>`
+  일 뿐 열거가 아니고, `<param>`은 `name`·`value` 둘 다 `xs:string`이다
+- **`<nav-action>`은 실파일 0건** — 어휘를 모르므로 판정하지 않고 `note_partial`한다
+- **아직 안 한 것**: `<link expression>` 안의 **필드**를 대조하면 참조 무결성 축이 넓어진다
+  (지금 이 자리의 필드는 아무도 안 본다). 축이 달라 ⑬이 아니라 ⑩의 몫이다
+- 주입 레시피 `R22-unknown-action-command` · `R23-drop-filter-link`
+- **원천**: 05 F5-g · **F5-h** · 2026-07-31 저작 B안
 
 ### R23. 집계 수준 정합 — 인코딩에 올린 행수준 차원 [L-B · **미구현** — 규칙 ⑫ 몫]
 

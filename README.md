@@ -32,14 +32,14 @@ twb-lint = 공식 XSD(A) 위에 **(B) 시맨틱 검증기**를 얹은 것.
 
 ## 상태
 
-**규칙 10종 가동.** io · L-A(XSD) · L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪이 실로직이다.
+**규칙 11종 가동.** io · L-A(XSD) · L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪⑬이 실로직이다.
 
 | | 상태 |
 |---|---|
 | io (unpack·parse·모델 추출·pack) | ✅ `.hyper` 라운드트립 바이트 동일성(AC8) 통과 |
 | L-A 구문 (vendored XSD) | ✅ 컴파일 캐시 + 심각도 등급. 정상본 61/61 통과 |
 | L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪ | ✅ 전부 가동 |
-| 테스트 | ✅ 3층 (스모크 / 규칙 계약·단위 / 골든셋) — **254 passed, 14 skipped** (골든셋 걸면 268) |
+| 테스트 | ✅ 3층 (스모크 / 규칙 계약·단위 / 골든셋) — **271 passed, 14 skipped** (골든셋 걸면 285) |
 | 라벨 확정 | ⏸ 사용자 배치 대기 (Tableau Desktop 필요 — `TODO.md` L1~L3) |
 
 **판정 대상 4항목** (`docs/01-problem-definition.md` §4):
@@ -65,7 +65,7 @@ twb-lint = 공식 XSD(A) 위에 **(B) 시맨틱 검증기**를 얹은 것.
 
 대상 환경: **Tableau 2026.1 · 로컬 전용** (`docs/02-specification.md` S7).
 
-가동 규칙 10종 — **심각도는 실측이 정했다**:
+가동 규칙 11종 — **심각도는 실측이 정했다**:
 
 | 규칙 | 담당 층 | 심각도 | 근거 |
 |---|---|---|---|
@@ -78,6 +78,7 @@ twb-lint = 공식 XSD(A) 위에 **(B) 시맨틱 검증기**를 얹은 것.
 | `calc.aggregation` 사용자 지정 집계 | 4 | WARNING | 20:0. LOD는 집계로 치지 않는다 |
 | `set.definition` 집합 기반 필드 | 4 | WARNING | 82:0. 모양을 열거하지 않고 **기반 필드 유무만** 본다 |
 | `action.refs` 동작 배선 | 2·4 | WARNING | 표면 9종 실측. `source-field` 반례 1건이 골든셋 파일이라 ERROR 불가 |
+| `action.shape` 동작 어휘 | 2 | WARNING | `<action>`은 세 모양뿐(14:0 · 17:0 · 1). 명령·param 목록이 좁아 ERROR 불가 |
 | `shelf.refs` 선반 배치 | 2·4 | WARNING | 표면 20여 종 실측. 반례 28건이 골든셋 파일 1개의 진짜 dangling |
 
 `manifest.gates`와 `named.refs`가 **XSD가 원리적으로 못 잡는** 로드 거부 클래스다.

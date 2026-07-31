@@ -300,6 +300,42 @@ def _r21_qualify_filter_level(root: Any) -> str | None:
     return None
 
 
+def _action_commands(root: Any) -> Any:
+    """`<actions>` 밑 `<action>`의 `<command>`들. 정의 사본(`<datasources>`)은 뺀다."""
+    for container in root.iter():
+        if not isinstance(container.tag, str) or fcp.strip_prefix(container.tag) != "actions":
+            continue
+        for action in container:
+            if not isinstance(action.tag, str) or fcp.strip_prefix(action.tag) != "action":
+                continue
+            for command in action.iter():
+                if isinstance(command.tag, str) and fcp.strip_prefix(command.tag) == "command":
+                    yield action, command
+
+
+def _r22_unknown_action_command(root: Any) -> str | None:
+    """R22 — 동작 명령을 실재하지 않는 이름으로 바꾼다 → 동작이 편집도 발동도 안 된다."""
+    for _action, command in _action_commands(root):
+        before = command.get("command")
+        if not before or before == "tsc:filter":
+            continue
+        command.set("command", "tsc:filter")
+        return f"동작 명령 {before} → tsc:filter"
+    return None
+
+
+def _r23_drop_filter_link(root: Any) -> str | None:
+    """R23 — 필터 동작의 `<link>`를 지운다 → 필드 매핑이 사라져 아무것도 안 걸린다."""
+    for action, command in _action_commands(root):
+        if command.get("command") != "tsc:tsl-filter":
+            continue
+        for child in list(action):
+            if isinstance(child.tag, str) and fcp.strip_prefix(child.tag) == "link":
+                action.remove(child)
+                return f"동작 '{action.get('caption') or action.get('name')}'의 <link> 제거"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -391,6 +427,20 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + 집합을 쓰는 계산이 전부 오류 상태",
         source="docs/05-xsd-spike.md F5-e",
         mutate=_r20_empty_set,
+    ),
+    Recipe(
+        id="R22-unknown-action-command",
+        rule="action.shape",
+        expected="열림 + 경고 없음 · 동작 대화상자에서 편집 불가, 동작이 발동하지 않는다",
+        source="docs/05-xsd-spike.md F5-h (2026-07-31 /author-loop 실측)",
+        mutate=_r22_unknown_action_command,
+    ),
+    Recipe(
+        id="R23-drop-filter-link",
+        rule="action.shape",
+        expected="열림 + 경고 없음 · 동작의 필드 열이 비고 아무 필터도 걸리지 않는다",
+        source="docs/05-xsd-spike.md F5-h",
+        mutate=_r23_drop_filter_link,
     ),
 )
 
