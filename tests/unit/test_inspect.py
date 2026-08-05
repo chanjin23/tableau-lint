@@ -163,6 +163,48 @@ def test_nested_dependency_columns_are_not_this_datasources_fields(tmp_path: Pat
     assert set(m.datasources["federated.abc"].fields) == {"mine"}
 
 
+def test_adhoc_calcs_join_the_field_universe(tmp_path: Path) -> None:
+    """임시 계산은 `<datasources>`에 없다 — 안 모으면 규칙 ②·⑪이 정상본을 친다 (03 D3.6.4)."""
+    xml = make_twb(
+        datasources=(Ds(name="federated.abc", columns=("mine",)),),
+        extra_body=(
+            "<worksheets><worksheet name='S'><table><view>"
+            "<datasource-dependencies datasource='federated.abc'>"
+            "<column caption='&quot;계획&quot;' datatype='string' name='[Calculation_9]'"
+            " user:unnamed='S'><calculation class='tableau' formula='&quot;계획&quot;' /></column>"
+            "<column datatype='string' name='[사본]' />"
+            "</datasource-dependencies>"
+            "</view></table></worksheet></worksheets>"
+        ),
+    )
+
+    fields = model_of(tmp_path, xml).datasources["federated.abc"].fields
+
+    # 표식이 붙은 것만 들어온다. 나머지는 주 데이터소스 정의의 사본이다.
+    assert set(fields) == {"mine", "Calculation_9"}
+    assert fields["Calculation_9"].origin == "adhoc"
+    assert fields["Calculation_9"].formula == '"계획"'
+
+
+def test_adhoc_calcs_of_an_unknown_datasource_are_ignored(tmp_path: Path) -> None:
+    """소속 데이터소스가 워크북에 없으면 담을 자리가 없다 — 규칙 ②가 따로 말한다."""
+    xml = make_twb(
+        datasources=(Ds(name="federated.abc", columns=("mine",)),),
+        extra_body=(
+            "<worksheets><worksheet name='S'><table><view>"
+            "<datasource-dependencies datasource='federated.없음'>"
+            "<column datatype='string' name='[Calculation_9]' user:unnamed='S' />"
+            "</datasource-dependencies>"
+            "</view></table></worksheet></worksheets>"
+        ),
+    )
+
+    m = model_of(tmp_path, xml)
+
+    assert set(m.datasources) == {"federated.abc"}
+    assert set(m.datasources["federated.abc"].fields) == {"mine"}
+
+
 def test_worksheets_dashboards_and_windows_are_separated(tmp_path: Path) -> None:
     """규칙 ③은 셋을 **3자 대조**한다 — 하나로 합치면 대조가 사라진다."""
     m = model_of(

@@ -161,6 +161,20 @@ def test_definition_copies_are_not_placements(tmp_path: Path, rule: ShelfRefsRul
     assert rule.check(ctx_for(tmp_path, xml)) == []
 
 
+def test_an_adhoc_calc_on_a_shelf_is_silent(tmp_path: Path, rule: ShelfRefsRule) -> None:
+    """선반에서 만든 임시 계산은 `<datasources>`에 없다 — 그래도 정상이다 (03 D3.6.4)."""
+    adhoc = qualified_ref("federated.abc", "Calculation_9")
+    xml = workbook(
+        "<view><datasource-dependencies datasource='federated.abc'>"
+        "<column caption='&quot;계획&quot;' datatype='string' name='[Calculation_9]'"
+        " user:unnamed='S1'><calculation class='tableau' formula='&quot;계획&quot;' /></column>"
+        "</datasource-dependencies></view>"
+        f"<cols>{adhoc}</cols>"
+    )
+
+    assert rule.check(ctx_for(tmp_path, xml)) == []
+
+
 def test_the_formatted_text_body_is_not_a_shelf(tmp_path: Path, rule: ShelfRefsRule) -> None:
     """`<run>`은 텍스트 서식의 본문이다 — 선반이 아니다 (반례 34건)."""
     xml = workbook(f"<formatted-text><run>&lt;{GONE}&gt;</run></formatted-text>")

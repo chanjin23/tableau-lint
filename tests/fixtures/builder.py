@@ -139,10 +139,13 @@ def make_twb(
         parts.body.append(extra_body)
 
     build_attr = f" source-build={quoteattr(source_build)}" if source_build else ""
+    # `xmlns:user`는 실파일 루트가 항상 선언한다. 빼면 `user:unnamed` 같은 실측 속성을
+    # 담은 조각이 파서에서 undeclared prefix로 깨져, 픽스처만 통과하는 테스트가 된다.
     return (
         "<?xml version='1.0' encoding='utf-8' ?>\n"
         f"<workbook original-version={quoteattr(version)}{build_attr} "
-        f"version={quoteattr(version)}>"
+        f"version={quoteattr(version)} "
+        "xmlns:user='http://www.tableausoftware.com/xml/user'>"
         + "".join(parts.body)
         + "</workbook>"
     )

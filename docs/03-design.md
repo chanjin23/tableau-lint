@@ -347,6 +347,7 @@ Tableau는 **커스터마이즈된 필드만** `<column>`으로 적는다. 손�
 | `<metadata-record class='column'>/<local-name>` | `metadata` | 평범한 DB 컬럼이 전부 dangling |
 | `<datasource>/<group>` | `group` | 그룹/집합이 dangling |
 | `<datasource>/<column-instance>` | `instance` | 집계 인스턴스가 dangling |
+| `<datasource-dependencies>/<column @user:unnamed>` | `adhoc` | 임시 계산이 dangling (**D3.6.4**) |
 
 실측 효과 (표본 10개, 참조 16,754건):
 
@@ -375,6 +376,32 @@ Tableau는 **커스터마이즈된 필드만** `<column>`으로 적는다. 손�
 
 ERROR 승격은 **라벨링 배치(TODO D1~D4) 이후**로 미룬다 — "이 dangling이 있으면 안 열린다"를
 Tableau 실로드로 확인한 표면에 한해 올린다. dangling 0인 표면 4종이 유력한 후보다.
+
+### D3.6.4 임시 계산은 `<datasources>`에 없다 — 규칙 ②·⑪의 거짓양성 (2026-08-05 실측)
+
+선반에서 더블클릭해 그 자리에 만든 계산(**임시 계산**, ad-hoc calculation)은
+데이터 패널에 뜨지 않고 `<datasources>`에도 올라가지 않는다. 정의는 **그것을 쓰는
+워크시트의 `<datasource-dependencies>` 안에만** 있다:
+
+```xml
+<worksheet name='SEC05_재고관리상태_M+1계획'>
+  <datasource-dependencies datasource='federated.1z0…'>
+    <column caption='"계획"' name='[Calculation_4000054048137217]'
+            user:unnamed='SEC05_재고관리상태_M+1계획'>
+      <calculation class='tableau' formula='"계획"' />
+  …
+  <cols>([federated.1z0…].[none:Calculation_4000054048165890:nk]
+       / [federated.1z0…].[none:Calculation_4000054048137217:nk])</cols>
+```
+
+D3.6.2의 네 곳은 전부 `<datasources>` 아래라 이 정의를 못 본다. 그래서 규칙 ②는
+`calc.field_refs`를, 규칙 ⑪은 `shelf.refs`를 **정상 워크북**에 대해 뱉었다
+(실측: MA_008 워크북, 임시 계산 4건 → finding 10건). AC7 위반이다.
+
+**표식은 `@user:unnamed`다** — 값은 그 계산을 만든 워크시트 이름이다. 이 속성이 붙은
+`<column>`만 유니버스에 더한다. `<datasource-dependencies>`를 통째로 담으면 안 된다 —
+나머지는 주 데이터소스 정의의 **사본**이고, 삭제된 필드의 사본이 남아 있으면 진짜
+dangling을 놓친다. `_datasource()`가 `.//`를 쓰지 않는 것과 같은 이유다.
 
 ## D3.7 calc 수집은 **문법 파서가 아니라 어휘 스캐너**다 (v1.5 — 2026-07-29 실측)
 

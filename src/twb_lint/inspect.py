@@ -14,6 +14,8 @@ workbook/document-format-change-manifest/*        매니페스트 항목 (원문
 workbook/datasources/datasource@name              데이터소스
   └ column@name                                   필드 (직계 자식만 — 아래 주석)
       └ calculation@formula                       계산필드 수식
+workbook//datasource-dependencies@datasource
+  └ column@name[@user:unnamed]                    임시 계산 (D3.6.4 — 여기에만 산다)
 workbook/worksheets/worksheet@name
 workbook/dashboards/dashboard//zone@name          배치된 시트
 workbook/windows/window@class='worksheet'|'dashboard'
@@ -30,6 +32,12 @@ from twb_lint import fcp, fieldref
 from twb_lint.io import safety, twb, twbx
 from twb_lint.models import Dashboard, DataSource, FieldDef, WorkbookModel
 from twb_lint.validation.context import ValidationContext
+
+USER_NS = "http://www.tableausoftware.com/xml/user"
+"""`<workbook>` 루트가 항상 선언하는 `user:` 네임스페이스."""
+
+ADHOC_ATTR = f"{{{USER_NS}}}unnamed"
+"""임시 계산 표식 — 값은 그 계산을 만든 워크시트 이름이다."""
 
 
 def inspect(source: Path, workdir: Path) -> WorkbookModel:
@@ -93,6 +101,7 @@ def _fill(model: WorkbookModel, root: Any) -> None:
     for el in root.findall("datasources/datasource"):
         ds = _datasource(el)
         model.datasources[ds.name] = ds
+    _add_adhoc_calcs(model, root)
 
     model.worksheets = {
         name for el in root.findall("worksheets/worksheet") if (name := el.get("name"))
@@ -153,6 +162,38 @@ def _datasource(el: Any) -> DataSource:
         if local is not None:
             _add_name(ds, _unbracket(local.text), "metadata")
     return ds
+
+
+def _add_adhoc_calcs(model: WorkbookModel, root: Any) -> None:
+    """**임시 계산**을 필드 유니버스에 더한다 (03 D3.6.4).
+
+    선반에서 더블클릭해 그 자리에 만든 계산은 `<datasources>`에 올라가지 않는다.
+    쓰는 워크시트의 `<datasource-dependencies>` 안에만 정의가 있고, 같은 워크시트의
+    선반이 그것을 참조한다. 모으지 않으면 규칙 ②·⑪이 **정상 워크북**을 두고
+    "데이터소스에 없다"고 말한다 (실측: MA_008 워크북, `"계획"` 등 4건).
+
+    `@user:unnamed`가 있는 `<column>`만 본다. `<datasource-dependencies>`의 나머지는
+    주 데이터소스 정의의 **사본**이라, 통째로 담으면 삭제된 필드의 사본이 남아 있을 때
+    진짜 dangling을 놓친다 (`_datasource()`가 직계 자식만 보는 것과 같은 이유).
+    """
+    for deps in root.iter("datasource-dependencies"):
+        ds = model.datasources.get(deps.get("datasource") or "")
+        if ds is None:
+            continue
+        for col in deps.findall("column"):
+            if col.get(ADHOC_ATTR) is None:
+                continue
+            name = _unbracket(col.get("name"))
+            if name is None or name in ds.fields:
+                continue
+            calc = col.find("calculation")
+            ds.fields[name] = FieldDef(
+                name=name,
+                caption=col.get("caption"),
+                datatype=col.get("datatype"),
+                formula=None if calc is None else calc.get("formula"),
+                origin="adhoc",
+            )
 
 
 def _add_name(ds: DataSource, name: str | None, origin: str, caption: str | None = None) -> None:

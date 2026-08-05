@@ -67,6 +67,26 @@ def test_worksheet_notation_resolves_against_calc_notation(
     assert rule.check(ctx_for(tmp_path, xml)) == []
 
 
+def test_an_adhoc_calc_is_not_dangling(tmp_path: Path, rule: CalcFieldRefsRule) -> None:
+    """임시 계산의 정의 자리는 `<datasource-dependencies>` 하나뿐이다 (03 D3.6.4)."""
+    xml = make_twb(
+        datasources=(DS,),
+        extra_body=(
+            '<worksheets><worksheet name="S"><table><view>'
+            "<datasource-dependencies datasource='federated.abc'>"
+            "<column datatype='string' name='[Calculation_9]' user:unnamed='S'>"
+            "<calculation class='tableau' formula='&quot;계획&quot;' /></column>"
+            "<column-instance column='[Calculation_9]' derivation='None'"
+            " name='[none:Calculation_9:nk]' pivot='key' type='nominal' />"
+            "</datasource-dependencies></view>"
+            '<filter column="[federated.abc].[none:Calculation_9:nk]" />'
+            "</table></worksheet></worksheets>"
+        ),
+    )
+
+    assert rule.check(ctx_for(tmp_path, xml)) == []
+
+
 def test_dangling_reference_is_a_warning_not_an_error(
     tmp_path: Path, rule: CalcFieldRefsRule
 ) -> None:

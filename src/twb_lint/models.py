@@ -161,6 +161,7 @@ class FieldDef:
     | `metadata` | `<metadata-record class='column'>/<local-name>` | **손대지 않은 DB 컬럼** |
     | `group` | `<datasource>/<group>` | 그룹/집합 |
     | `instance` | `<datasource>/<column-instance>` | 집계 인스턴스 (`[min:x:qk]`) |
+    | `adhoc` | `<datasource-dependencies>/<column @user:unnamed>` | **임시 계산** (03 D3.6.4) |
 
     `column` 하나만 모으면 실사용 참조의 약 4%가 dangling으로 잡힌다 (실측 687/16,754)."""
 
