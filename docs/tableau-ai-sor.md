@@ -13,6 +13,7 @@
 | 05 | [XSD 스파이크 실측 (Spike Report)](./05-xsd-spike.md) | ✅ 완료 v1.1 |
 | 06 | [규칙 후보 인벤토리 (Rule Candidates)](./06-rule-candidates.md) | 🔄 living |
 | 07 | [구현 가이드 (Implementation Guide)](./07-implementation-guide.md) | 🔄 living v1.1 |
+| 08 | [저작 레시피 문제정의 (Authoring Recipes)](./08-authoring-recipes.md) | 🔄 초안 v0.1 |
 
 **구현 착수 전에는 07을 읽는다** — G1~G10 함정, 검증 파이프라인, 관례.
 루트 [`CLAUDE.md`](../CLAUDE.md)가 진입점이며 여기와 07을 가리킨다.
