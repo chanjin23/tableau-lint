@@ -109,6 +109,29 @@ XSD 선택 키는 `<workbook version>`이 **아니라** `source-build`다 (2026.
 **층 1은 막고, 층 2~4는 말한다.** 2~4층은 파일이 열리므로 WARNING이다 — 그래서
 `passed=true`를 "괜찮다"로 읽으면 안 된다. **findings를 읽어야 한다** (02 AC9).
 
+## 저작 레시피 — XML을 쓸 때 (검증의 짝)
+
+검증은 **사후**다 — 틀림을 잡지만 맞는 형태를 제시하지 못한다. 그 짝이
+[`docs/recipes/`](./docs/recipes)의 **저작 레시피**다: Tableau UI 조작이 XML을 어떻게
+쓰는지를 실측한 조작별 정답지 (문제정의: [`docs/08-authoring-recipes.md`](./docs/08-authoring-recipes.md)).
+
+**사용법 — AI(또는 사람)가 `.twb` XML을 만들거나 고치기 전에:**
+
+```
+1. docs/recipes/README.md    "하려는 작업 → 레시피" 매핑표에서 조회
+2. 레시피대로 작성            XML 조각·속성 규칙·불변 조건(동반 변경)을 그대로 따른다
+3. twb_validate              게이트 통과 확인 + findings 읽기
+4. (최종 1회) Tableau 재저장  diff에 노이즈만 남으면 정본이다 — 판독법은 레시피의
+                             "재저장 검증" 절과 MA_008 신호노이즈 문서
+```
+
+- **매핑표에 없는 작업이면 레시피를 지어내지 않는다** — 미관찰로 기록하고 관찰을 공급받는다
+  (08 §6: 거짓 레시피보다 없음이 낫다)
+- 레시피의 모든 서술에는 근거 커밋 sha 또는 `확인/추정` 등급이 붙어 있다.
+  `추정`·`?` 항목은 관찰 승격 전에는 신뢰하지 않는다
+- 공통 원칙 6개(이름 참조·동반 변경·삽입 정렬 등)는 [`docs/recipes/README.md`](./docs/recipes/README.md)에 있다
+- E2E 검증 이력은 [`docs/recipes/90-e2e-log.md`](./docs/recipes/90-e2e-log.md)
+
 ## 설치
 
 ```bash
@@ -287,7 +310,7 @@ twb_inspect(파일)  →  caption↔내부 ID 대조, fields로 참조 가능 �
 1. twb_validate(.twbx)   기준선 — 원래 있던 WARNING을 기록한다
 2. twb_unpack            .twb 꺼내기
 3. twb_inspect           내부 ID·필드 목록·release 확보
-4. (XML 편집)            ← 도구 없음. 아래 "한계" 참조
+4. (XML 편집)            ← 도구 없음. docs/recipes/ 레시피대로 쓴다. 아래 "한계" 참조
 5. twb_validate(.twb)    채점. 1단계와 대조. 문제 있으면 4로
 6. twbx.pack()           ← MCP 미노출. 파이썬에서 직접
 7. twb_validate(.twbx)   최종
@@ -304,7 +327,7 @@ twb_inspect(파일)  →  caption↔내부 ID 대조, fields로 참조 가능 �
 | | |
 |---|---|
 | `pack`이 MCP에 없다 | 재포장은 파이썬에서 `twbx.pack(root, out)`. MVP가 read-only라 노출하지 않았다 (02 §89) |
-| 편집 연산이 없다 | 의존 참조 자동 갱신·dangling 유발 시 거부는 C4 편집기 몫. 지금은 XML을 직접 만진다 |
+| 편집 연산이 없다 | 의존 참조 자동 갱신·dangling 유발 시 거부는 C4 편집기 몫. 지금은 XML을 직접 만진다 — 쓸 때는 [`docs/recipes/`](./docs/recipes) 레시피를 따른다 |
 | `coverage`를 반환하지 않는다 | 코어 `ValidationReport`는 갖고 있는데 MCP 응답에서 버린다 → 호출자가 검사 범위를 알 수 없다 (03 D2, `TODO.md` F3) |
 | 선반 **조합**을 검사하지 않는다 | 배치 참조 실존은 규칙 ⑪이 본다. 어떤 필드를 어떤 선반에 놓으면 오류인지(T4-b)는 정답지가 없다 (01 §7) |
 | `passed=true` ≠ 열린다 | 규칙 ⑥의 품질은 `manifest_gates.json`의 쌍 개수다. 표가 2쌍이던 시점에 실파일 1건이 통과하고 Tableau가 `D2E8DA72`로 거부했다 (05 F9) |
