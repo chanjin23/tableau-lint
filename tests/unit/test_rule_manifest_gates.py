@@ -84,16 +84,19 @@ def test_simple_id_without_manifest_is_an_error(rule: ManifestGatesRule) -> None
     findings = [f for f in rule.check(ctx) if f.location == "simple-id"]
 
     assert [f.severity for f in findings] == [Severity.ERROR]
-    assert "WindowsPersistSimpleIdentifiers" in findings[0].message
     assert "SheetIdentifierTracking" in findings[0].message
 
 
-def test_simple_id_with_both_items_is_silent(rule: ManifestGatesRule) -> None:
-    """실파일 113개가 전부 이 형태다 — 여기서 finding이 나면 AC7이 깨진다."""
+def test_simple_id_needs_only_sheet_identifier_tracking(rule: ManifestGatesRule) -> None:
+    """분리 실험 실측 — `WindowsPersistSimpleIdentifiers`만 빼면 **열린다**.
+
+    최초안은 둘 다 요구했다. 그건 과요구고, 정상 파일을 때린다 (AC7).
+    실험: SIT만 뺀 변형은 로드 거부, WPSI만 뺀 변형은 정상 로드 (2026-08-10).
+    """
     ctx = make_ctx(
         make_twb(
-            manifest=("WindowsPersistSimpleIdentifiers", "SheetIdentifierTracking"),
-            extra_body="<simple-id uuid='{0B5E7A10-0001-4A00-9000-0000000000A1}' />",
+            manifest=("SheetIdentifierTracking",),
+            extra_body="<simple-id uuid='{0B5E7A10-0001-4A00-9000-000000A1}' />",
         )
     )
 
