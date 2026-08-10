@@ -523,3 +523,51 @@ no declaration found for element 'manual-sort'
 
 전제: *"매니페스트 항목 추가 자체는 무해"*(함정 I1 격리 실험)의 **역방향은 미검증**이다 —
 삭제가 항상 거부를 유발하는지는 실험이 답한다.
+
+---
+
+## R25 — `<object-graph>` 누락 → ✅ **규칙 ⑭ `datasource.shape`** (2026-08-10)
+
+**증상은 층 1~4 어디에도 없다.** 파일이 열리고 시트도 보이는데, **데이터 원본 탭을
+클릭하는 순간 Tableau가 그대로 종료된다.** 저장할 것도 없이 앱이 사라진다.
+
+| | |
+|---|---|
+| 발견 | `/author-loop` 저작본(`관찰_base.twb`)을 소유자가 열어 확인 |
+| 린터(당시) | `passed=true`, findings **0** — 잡는 규칙이 없었다 |
+| 상관 | `relation`을 가진 데이터 원본 **113 : 0** 전부 `<object-graph>` 보유 |
+
+### 분리 실험이 후보 셋을 갈랐다 (2026-08-10)
+
+결함 표본은 세 조각이 한꺼번에 빠져 있었다. 정본(`관찰_B_CSV연결만.twb`)에서
+하나씩만 지운 변형 3개를 열었다:
+
+| 변형 | 뺀 것 | Tableau | 결론 |
+|---|---|---|---|
+| V1 | `<object-graph>` | **데이터 원본 클릭 시 즉시 종료** | 인과 확정 → 규칙 ⑭ ERROR |
+| V2 | `<relation type='table'>`의 `<columns>` | **이상 없음** | **후보 폐기** — 상관 39:0이었지만 증상이 없다 |
+| V3 | 매니페스트 3항목 | **로드 거부** D2E8DA72 | 규칙 ⑥-b 게이트 `object-graph` 추가 |
+
+V3의 거부 메시지는 세 자리를 한꺼번에 지목했다 — 세 항목이 데이터 원본의
+객체 모델 문법을 통째로 연다:
+
+```
+Error(119,178): value 'table' not in enumeration                    ← relation@type
+Error(120,95):  missing required attribute 'dim-percentage'         ← columns
+Error(120,95):  missing required attribute 'measure-percentage'
+Error(124,21):  no declaration found for element 'object-graph'     ← object-graph
+```
+
+### 심각도 — 층 1이 아닌데 ERROR인 유일한 규칙
+
+- 인과가 실험으로 확정됐다 (V1). 상관만 보고 낸 것이 아니다
+- 실파일 114개 finding 0건 — 거짓양성 위험 없음 (AC7)
+- 증상이 층 4보다 무겁다. **빨간 느낌표는 보고 고치지만 앱 종료는 작업분이 날아간다**
+
+→ `01 v2.0 §4`의 실패 4층에 이 자리가 없다. **층 분류의 빈칸**이다 (`TODO.md` L6).
+
+### 남은 미분리
+
+V3는 3항목을 한꺼번에 지웠다 — `object-graph`를 게이팅하는 것이 셋 중 어느 것인지
+모른다. 대응표는 셋 다 요구한다(과요구 가능). `simple-id`에서 같은 과요구가
+실험으로 드러난 전례가 있다 (`TODO.md` L5).

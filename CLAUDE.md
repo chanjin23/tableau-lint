@@ -5,7 +5,7 @@
 **"열었을 때 빨간 느낌표가 없는가"**를 판정한다.
 
 대상: Tableau **2026.1 단독 · 로컬 오프라인**.
-현 단계: **규칙 11종 가동** — io · L-A(XSD) · L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪⑬.
+현 단계: **규칙 12종 가동** — io · L-A(XSD) · L-B 규칙 ①②③⑥⑦⑧⑨⑩⑪⑬⑭.
 정상본 **61개** ERROR 0 · 주입 6종 중 5종 차단(R1a는 의도적 WARNING).
 
 **2026-07-31 문제정의 재설정 (01 v2.0)** — 위험은 *편집*이 아니라 **생성**에 있다.
@@ -34,7 +34,7 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 271 passed, 14 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 295 passed, 14 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
 .venv/Scripts/python -m mypy             # Success: no issues in 54 source files
 ```
@@ -68,7 +68,7 @@ export TWB_LINT_GOLDEN_NORMAL='<정상본 glob>;<glob>;...'   # ';' 구분, 미�
   파서는 `io.safety.make_parser()`로만 만든다 — 기본 파서는 엔티티를 해석한다(XXE)
 - **검사 못 했으면 말한다** — `ctx.note_skip()`. 빈 리스트를 조용히 반환하면
   "전부 검사했고 문제없음"으로 기록된다
-- 새 규칙 = `validation/semantic/` 파일 1개 + `@register`. 코어 무수정 (현재 11규칙).
+- 새 규칙 = `validation/semantic/` 파일 1개 + `@register`. 코어 무수정 (현재 12규칙).
   계약 테스트가 새 규칙도 자동으로 잡는다
 - findings 정렬은 **엔진이 보장**한다(`stage→rule_id→line→location`). 규칙은 반환 순서를 신경 쓰지 않는다
 - 테스트 입력은 `tests/fixtures`의 `make_twb()`/`make_ctx()`로. 1MB 실파일로 디버깅하지 않는다

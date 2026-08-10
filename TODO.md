@@ -35,6 +35,7 @@
 | `action.refs` | T3 — 동작 배선 참조 | WARNING |
 | `action.shape` | T3 — 동작 배선 **어휘** (명령·param·`<link>` 짝) | WARNING |
 | `shelf.refs` | T4-a — 선반 배치 참조 | WARNING |
+| `datasource.shape` | 층 밖 — `<object-graph>` 누락(앱 종료) | **ERROR** |
 
 **T1은 지키는데 층 2~4는 1/8이었다** (05 F5-g 실측). 저작 3종을 열어 찾은
 결함 7건 중 린터가 잡은 건 0건이고, 앞 반복에서 규칙화한 ⑦-d 1건만 잡혔다.
@@ -124,12 +125,17 @@ D3은 뷰 그레인을 정적으로 구할 수 있는지부터 정해야 하므�
       `calc.field_refs` 표면별 ERROR 승격(dangling 0인 표면 4종).
       **그때까지 현재 심각도로 동결한다**
 - [ ] **L3. 수치 확정** — AC2(커버리지)·AC5(속도) baseline 1회 계측
-- [ ] **L4. `simple-id` 게이트 분리 실험** — `WindowsPersistSimpleIdentifiers`와
-      `SheetIdentifierTracking`은 실파일 113개에서 **항상 함께** 나타나 어느 쪽이
-      게이팅하는지 관찰로 안 갈린다. 지금은 `edit-group-action` 선례대로 둘 다 요구한다.
-      실험본 2개(`C:\dev\새 폴더\관찰_실험_A_WPSI만.twb`·`_B_SIT만.twb`)를 열어 보면
-      확정된다 — **한쪽만으로 열리면 그쪽이 게이트**이고, 지금 대응표는 과요구다
-      (정상 파일을 때릴 수 있다). 둘 다 거부되면 현 상태가 맞다
+- [x] **L4. `simple-id` 게이트 분리 실험** ✅ 2026-08-10 — SIT만 빼면 거부,
+      WPSI만 빼면 열린다. 게이트는 `SheetIdentifierTracking` 단독이고 최초안은
+      과요구였다. WPSI는 `known_items_unmapped`로 복귀
+- [ ] **L5. `object-graph` 게이트 분리 실험** — V3는 `ObjectModelTableType`·
+      `ObjectModelEncapsulateLegacy`·`SchemaViewerObjectModel` 3항목을 **한꺼번에**
+      지웠다. 어느 것이 `object-graph`를 게이팅하는지 모른 채 셋 다 요구하고 있다 —
+      L4에서 드러난 과요구와 같은 위험이다. 정본에서 하나씩만 뺀 변형 3개를 연다
+- [ ] **L6. 실패 층 분류에 빈칸이 있다** — 규칙 ⑭가 잡는 것("열리는데 데이터 원본
+      탭에서 앱이 종료")은 `01 v2.0 §4`의 4층 어디에도 없다. 층 1(로드 거부)이
+      아닌데 증상은 층 4(빨간 느낌표)보다 무겁다. 층을 늘릴지, 층 1의 변종으로 볼지
+      정해야 심각도 정책(`02 AC9`)이 일관된다. **지금은 규칙 ⑭만 예외로 ERROR다**
 
 주입 고장본은 이미 생성기가 있다. 배치를 돌릴 때 이 명령 하나면 된다:
 
