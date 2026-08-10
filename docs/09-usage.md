@@ -29,7 +29,7 @@ uv run twb-lint validate path/to/workbook.twbx   # CLI
 | 트랜스포트 | **stdio** |
 | SDK | 공식 `mcp[cli]` FastMCP |
 | 진입점 | `twb-lint-mcp` = `twb_lint.mcp.server:main` |
-| 도구 | `twb_validate` · `twb_inspect` · `twb_unpack` |
+| 도구 | `twb_validate` · `twb_inspect` · `twb_unpack` · `twb_recipe` |
 | 리소스·프롬프트 | 없음 |
 | 네트워크 | 없음. 전부 로컬 파일 I/O |
 
@@ -70,7 +70,7 @@ Claude Desktop (`claude_desktop_config.json`):
 경로는 **절대경로**로 준다. 도구에 넘기는 파일 경로가 상대경로면 서버 프로세스의 작업
 디렉토리 기준으로 해석된다 — 호스트가 어디서 띄웠는지에 따라 달라진다.
 
-### 도구 3개
+### 도구 4개
 
 #### `twb_validate(path) -> {passed, findings[]}`
 
@@ -147,6 +147,23 @@ Claude Desktop (`claude_desktop_config.json`):
   (헤더는 아카이브 제작자가 쓰는 값이라 거짓말할 수 있다)
 - 정책 위반·깨진 ZIP·`.twb` 없음·권한 없음은 **예외** (`ArchiveError` ⊂ `safety.InputError`)
 
+#### `twb_recipe(query='') -> {found, ...}`
+
+XML을 쓰기(생성·편집) **전에** 조회하는 저작 레시피. 다른 PC·세션에서 MCP만
+연결해도 레시피가 넘어가게 하는 통로다 — 도구 설명 자체가 "쓰기 전에 반드시 조회"를
+지시하므로 호스트 LLM이 편집 전에 자연스럽게 부른다.
+
+| 호출 | 반환 |
+|---|---|
+| `twb_recipe()` | `{found:true, index:<매핑표 본문>, recipes:[파일명…]}` |
+| `twb_recipe('계산 필드 추가')` | `{found:true, name:'01-calc-field-create.md', content:<본문>}` |
+| 맞는 게 없음 | `{found:false, message, index}` — **지어내지 말고** 미관찰로 보고 |
+
+- 매칭은 결정론 — 질의어 토큰의 제목·본문 등장 점수, 동점은 파일명 순
+- 내용의 SOR은 `docs/recipes/`다. 서버는 읽기만 한다 — 문서를 고치면 그대로 반영
+- wheel 설치처럼 `docs/`가 없는 배치에서는 `found:false` + 안내 메시지
+  (저장소 체크아웃 + `--directory` 등록이 전제)
+
 ### 전형적 흐름
 
 **게이트만** — CI·산출물 검사:
@@ -167,7 +184,7 @@ twb_inspect(파일)  →  caption↔내부 ID 대조, fields로 참조 가능 �
 1. twb_validate(.twbx)   기준선 — 원래 있던 WARNING을 기록한다
 2. twb_unpack            .twb 꺼내기
 3. twb_inspect           내부 ID·필드 목록·release 확보
-4. (XML 편집)            ← 도구 없음. recipes/ 레시피대로 쓴다
+4. twb_recipe('작업')    레시피 확보 → 그대로 XML 편집 (편집 도구는 없다)
 5. twb_validate(.twb)    채점. 1단계와 대조. 문제 있으면 4로
 6. twbx.pack()           ← MCP 미노출. 파이썬에서 직접
 7. twb_validate(.twbx)   최종

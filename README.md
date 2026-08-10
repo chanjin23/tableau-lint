@@ -51,6 +51,7 @@ claude mcp add twb-lint -- uv run --directory /path/to/tableau-lint twb-lint-mcp
 | `twb_validate` | 게이트 판정 — `passed=false`면 내보내지 않는다 |
 | `twb_inspect` | 판정 없이 구조(필드·시트·버전)만 추출 — 편집 전 정찰 |
 | `twb_unpack` | `.twbx`를 풀어 `.twb`를 꺼낸다 |
+| `twb_recipe` | XML을 쓰기 전에 저작 레시피 조회 — 인수 없으면 매핑표, 질의어 주면 해당 레시피 본문 |
 
 ## XML을 쓸 때 — 저작 레시피
 

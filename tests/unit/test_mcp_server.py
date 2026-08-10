@@ -62,3 +62,27 @@ def test_inspect_returns_the_structure_model(tmp_path: Path) -> None:
 
     assert model["release"] == "2026.1"
     assert model["worksheets"] == ["S1"]
+
+
+def test_recipe_without_query_returns_the_index() -> None:
+    result = server.twb_recipe()
+
+    assert result["found"] is True
+    assert "레시피" in result["index"]
+    assert "01-calc-field-create.md" in result["recipes"]
+
+
+def test_recipe_with_query_returns_one_recipe_body() -> None:
+    result = server.twb_recipe("계산 필드 추가")
+
+    assert result["found"] is True
+    assert result["name"] == "01-calc-field-create.md"
+    assert "calculation" in result["content"]
+
+
+def test_recipe_miss_says_so_instead_of_guessing() -> None:
+    """맞는 레시피가 없으면 지어내지 않고 없다고 말한다 — 인덱스를 함께 준다."""
+    result = server.twb_recipe("qqqqzzzz")
+
+    assert result["found"] is False
+    assert "index" in result
