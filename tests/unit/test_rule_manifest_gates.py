@@ -73,6 +73,33 @@ def test_gates_measured_on_2026_07_30(rule: ManifestGatesRule, element: str, ite
     assert item in findings[0].message
 
 
+def test_simple_id_without_manifest_is_an_error(rule: ManifestGatesRule) -> None:
+    """2026-08-10 실측 — 매니페스트 블록이 통째로 없는 저작본이 로드 거부됐다 (D2E8DA72).
+
+    `passed=true`로 통과시켰던 결함이다. 거부 메시지가 요소를 직접 지목했다:
+    `element 'simple-id' is not allowed for content model '…,table)'`.
+    """
+    ctx = make_ctx(make_twb(extra_body="<simple-id uuid='{0B5E7A10-0001-4A00-9000-000000A1}' />"))
+
+    findings = [f for f in rule.check(ctx) if f.location == "simple-id"]
+
+    assert [f.severity for f in findings] == [Severity.ERROR]
+    assert "WindowsPersistSimpleIdentifiers" in findings[0].message
+    assert "SheetIdentifierTracking" in findings[0].message
+
+
+def test_simple_id_with_both_items_is_silent(rule: ManifestGatesRule) -> None:
+    """실파일 113개가 전부 이 형태다 — 여기서 finding이 나면 AC7이 깨진다."""
+    ctx = make_ctx(
+        make_twb(
+            manifest=("WindowsPersistSimpleIdentifiers", "SheetIdentifierTracking"),
+            extra_body="<simple-id uuid='{0B5E7A10-0001-4A00-9000-0000000000A1}' />",
+        )
+    )
+
+    assert [f for f in rule.check(ctx) if f.location == "simple-id"] == []
+
+
 def test_gate_finding_carries_the_first_occurrence_line(rule: ManifestGatesRule) -> None:
     """Tableau 거부 메시지가 줄 기준이라 대조가 되려면 줄번호가 있어야 한다."""
     ctx = make_ctx(make_twb(extra_body="<manual-sort />\n<manual-sort />"))
@@ -108,7 +135,7 @@ def test_elements_outside_the_table_are_not_guessed(rule: ManifestGatesRule) -> 
 
 
 def test_unmapped_items_are_reported_as_partial_coverage(rule: ManifestGatesRule) -> None:
-    """이름만 알고 매핑을 모르는 항목 14종은 **검사할 수 없다** — 그 사실을 보고한다."""
+    """이름만 알고 매핑을 모르는 항목 12종은 **검사할 수 없다** — 그 사실을 보고한다."""
     ctx = make_ctx(make_twb())
 
     rule.check(ctx)

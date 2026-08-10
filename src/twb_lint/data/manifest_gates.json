@@ -2,7 +2,7 @@
   "schema": 2,
   "note": "기능 ↔ <document-format-change-manifest> 항목 대응 (L-B 규칙 ⑥). 유효 문법 = version 선언 × 매니페스트 항목 집합이라, 기능을 쓰면서 대응 항목을 선언하지 않으면 로드 거부된다. 공식 XSD는 이 요소들을 무조건 허용하므로 L-A가 원리적으로 못 잡는다.",
   "policy": "표에 있는 기능만 ERROR로 판정한다. 표에 없는 요소를 추측해 ERROR를 내지 않는다 (docs/02-specification.md S1-6).",
-  "provenance": "docs/05-xsd-spike.md F5·F7 · docs/06-rule-candidates.md R1 · 2026-07-30 실파일 61개 상관 분석",
+  "provenance": "docs/05-xsd-spike.md F5·F7 · docs/06-rule-candidates.md R1 · 2026-07-30 실파일 61개 상관 분석 · 2026-08-10 실파일 113개 상관 분석(simple-id)",
 
   "fcp_rule": {
     "note": "규칙 ⑥-a. fcp 계열은 대응표가 필요 없다 — 기능명이 이름 안에 박혀 있어 구조에서 도출된다. 트리에 `_.fcp.<F>.<true|false>...<이름>`이 있으면 매니페스트에 `_.fcp.<F>.true...<F>`가 있어야 한다. 표본 10/10 일치 (05 F7).",
@@ -45,11 +45,17 @@
       "requires": ["ParameterActionClearSelection"],
       "symptom": "no declaration found for element 'clear-option'",
       "source": "2026-07-30 실파일 61개 상관. clear-option 출현 72회 전부 부모가 edit-parameter-action이고, 항목 ParameterActionClearSelection과 쌍조건(반례 0). 거부 메시지는 부모인 edit-parameter-action 쪽만 실측됐다 — 이 항목 단독 인과는 미실측이라 요소를 clear-option으로 좁혀 잡는다(매개변수 액션에 clear-option이 없으면 요구하지 않는다)"
+    },
+    {
+      "element": "simple-id",
+      "requires": ["WindowsPersistSimpleIdentifiers", "SheetIdentifierTracking"],
+      "symptom": "no declaration found for element 'simple-id' / attribute 'uuid' is not declared for element 'simple-id' / element 'simple-id' is not allowed for content model '(((layout-options?)|(repository-location?)),table)'",
+      "source": "2026-08-10 실측. 매니페스트 블록 자체가 없는 저작본(worksheet/simple-id 2개)이 Tableau 2026.1에서 로드 거부(D2E8DA72), 거부 메시지가 요소를 직접 지목했다. 실파일 113개 상관: simple-id 보유 113개 전부 두 항목을 선언하고 있고(반례 0), 두 항목만 있고 요소가 없는 파일도 0. 부모는 worksheet 3737 · window 3854 · dashboard 117. 두 항목은 코퍼스에서 항상 함께 나타나 **어느 쪽이 게이팅하는지 관찰로 분리되지 않는다** — edit-group-action(GroupAction+GroupActionAddRemove) 선례대로 둘 다 요구한다. 분리 실험(한쪽만 선언한 변형 2개를 열기)이 확보 경로다"
     }
   ],
 
   "known_items_unmapped": {
-    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다. ParameterAction·ParameterActionClearSelection은 2026-07-30 실측 거부로 gates로 옮겼다.",
+    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다. ParameterAction·ParameterActionClearSelection은 2026-07-30 실측 거부로 gates로 옮겼다. SheetIdentifierTracking·WindowsPersistSimpleIdentifiers는 2026-08-10 실측 거부(simple-id)로 gates로 옮겼다 — 예고한 확보 경로가 그대로 작동했다.",
     "items": [
       "AccessibleZoneTabOrder",
       "AnimationOnByDefault",
@@ -61,8 +67,6 @@
       "ParameterDefaultValues",
       "SchemaViewerObjectModel",
       "SetMembershipControl",
-      "SheetIdentifierTracking",
-      "WindowsPersistSimpleIdentifiers",
       "WorksheetBackgroundTransparency",
       "ZoneBackgroundTransparency"
     ]
