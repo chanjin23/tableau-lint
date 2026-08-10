@@ -49,4 +49,6 @@
 
 - [00-inventory.md](./00-inventory.md) — 코퍼스 관찰 분류 (근거 커밋 원장)
 - [90-e2e-log.md](./90-e2e-log.md) — E2E 실측 로그
+- [91-feature-coverage.md](./91-feature-coverage.md) — 기능 커버리지 대조.
+  **레시피가 없는 것을 여기서 찾는다** — B군(표본 있음) / C군(표본 0, 관찰 필요)
 - 근거 코퍼스: MA_008 저장소 `git show <sha> -- xml/`. `추정`·`?` 항목은 관찰 승격 전 신뢰 금지
