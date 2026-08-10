@@ -21,7 +21,9 @@
 | 워크시트 만들기 · 복제 · 개명 · 삭제 | [09](./09-worksheet-lifecycle.md) |
 | 범례 시트 · 범례 카드 | [10](./10-legend-sheets.md) |
 | 열/행 선반 배치 · 이중축 · 마크 카드 분리 | [11](./11-shelf-expressions.md) |
-| 필터 걸기/고치기 | [12](./12-filters.md) |
+| 필터 걸기/고치기 (목록·범위·날짜·컨텍스트·데이터원본) | [12](./12-filters.md) |
+| **집합 만들기 · 뷰에 배치** | [23](./23-sets.md) |
+| **도구 설명 뷰 (viz in tooltip)** | [24](./24-viz-in-tooltip.md) |
 | 마크 유형 · 색/텍스트 인코딩 · 레이블 · 도구설명 | [13](./13-marks-encodings.md) |
 | 정렬 | [14](./14-sorts.md) |
 | 대시보드에 시트 놓기 | [03](./03-dashboard-place-worksheet.md) |

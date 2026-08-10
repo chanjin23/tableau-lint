@@ -61,7 +61,7 @@
   ],
 
   "known_items_unmapped": {
-    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다. ParameterAction·ParameterActionClearSelection은 2026-07-30 실측 거부로 gates로 옮겼다. SheetIdentifierTracking은 2026-08-10 실측 거부(worksheet/simple-id)로 gates로 옮겼다 — 예고한 확보 경로가 그대로 작동했다. ObjectModelTableType·ObjectModelEncapsulateLegacy·SchemaViewerObjectModel은 2026-08-10 분리 실험 V3(로드 거부)로 gates(object-graph)로 옮겼다 — 셋 중 어느 것인지는 미분리다. WindowsPersistSimpleIdentifiers는 같은 날 분리 실험에서 **빼도 열렸다** — worksheet/simple-id의 게이트가 아님이 확정됐고, window/simple-id를 게이팅한다는 추정만 남아 여기 머문다(그 자리를 건드리는 실험 필요).",
+    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다. ParameterAction·ParameterActionClearSelection은 2026-07-30 실측 거부로 gates로 옮겼다. SheetIdentifierTracking은 2026-08-10 실측 거부(worksheet/simple-id)로 gates로 옮겼다 — 예고한 확보 경로가 그대로 작동했다. ObjectModelTableType·ObjectModelEncapsulateLegacy·SchemaViewerObjectModel은 2026-08-10 분리 실험 V3(로드 거부)로 gates(object-graph)로 옮겼다 — 셋 중 어느 것인지는 미분리다. VizInTooltipHideWorksheet은 2026-08-10 통제 관찰에서 새로 확보했다 — 도구 설명 뷰를 삽입하는 순간 붙는다(레시피 24). 대응 요소는 미상. WindowsPersistSimpleIdentifiers는 같은 날 분리 실험에서 **빼도 열렸다** — worksheet/simple-id의 게이트가 아님이 확정됐고, window/simple-id를 게이팅한다는 추정만 남아 여기 머문다(그 자리를 건드리는 실험 필요).",
     "items": [
       "AccessibleZoneTabOrder",
       "AnimationOnByDefault",
@@ -70,6 +70,7 @@
       "ObjectModelExtractV2",
       "ParameterDefaultValues",
       "SetMembershipControl",
+      "VizInTooltipHideWorksheet",
       "WindowsPersistSimpleIdentifiers",
       "WorksheetBackgroundTransparency",
       "ZoneBackgroundTransparency"

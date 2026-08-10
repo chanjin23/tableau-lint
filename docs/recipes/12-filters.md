@@ -4,8 +4,8 @@
 |---|---|
 | 판정 표면 | T4 |
 | UI 경로 | 필드를 필터 선반에 드래그 > 편집 |
-| 근거 | MA_008 `7353886` `529e436` `146f488` `e6a02cc` `358c382` `b63e1b1` `57e556a` |
-| Tableau | 2026.1 |
+| 근거 | MA_008 `7353886` `529e436` `146f488` `e6a02cc` `358c382` `b63e1b1` `57e556a` · 2026-08-10 통제 관찰 `관찰_01`~`05` |
+| Tableau | 2026.1 · 2026.1.1 |
 
 ## categorical (`7353886`)
 
@@ -43,10 +43,91 @@
 복제 판별에도 쓰인다 — `7e15b84`는 이 속성의 유무로 어느 시트에서 복제됐는지 역추론했다.
 AI 저작 시: 관찰된 조합 중 하나를 그대로 쓴다. 섞지 말 것(`추정` — 섞은 관찰 없음).
 
+## `<slices>`가 짝으로 따라온다 (통제 관찰 2026-08-10)
+
+**워크시트 필터는 `<filter>` 하나로 끝나지 않는다.** 바로 뒤에 `<slices>`가 붙는다:
+
+```xml
+<filter class='categorical' column='[federated.…].[none:품목:nk]'>
+  <groupfilter function='union' user:ui-domain='database'
+               user:ui-enumeration='inclusive' user:ui-marker='enumerate'>
+    <groupfilter function='member' level='[none:품목:nk]' member='&quot;노트북&quot;' />
+    <groupfilter function='member' level='[none:품목:nk]' member='&quot;모니터&quot;' />
+  </groupfilter>
+</filter>
+<slices>
+  <column>[federated.…].[none:품목:nk]</column>
+</slices>
+```
+
+- 위치는 `<view>` 안, `<datasource-dependencies>` **다음** · `<aggregation>` **앞**
+- `<filter @column>`과 `<slices><column>`은 **같은 2단 표기**로 일치해야 한다
+- `<filter>`가 여러 개면 `<slices>`에도 그만큼 `<column>`이 쌓인다
+- `groupfilter@level`은 **1단 인스턴스 표기**(`[none:품목:nk]`)다 — `filter@column`의
+  2단 표기와 다르다 (07 G8 · 규칙 ⑦-d)
+
+## 측정값 범위 · 날짜 범위 (`관찰_02`·`03`)
+
+```xml
+<!-- 측정값: 집계 인스턴스를 건다 -->
+<filter class='quantitative' column='[federated.…].[sum:매출:qk]' included-values='in-range'>
+  <min>500</min><max>1500</max>
+</filter>
+
+<!-- 날짜: 값이 # 로 감싸인다 -->
+<filter class='quantitative' column='[federated.…].[none:기준월:qk]' included-values='in-range'>
+  <min>#2026-01-01#</min><max>#2026-02-28#</max>
+</filter>
+```
+
+**날짜 필터는 새 인스턴스를 만든다** — 뷰에 `[yr:기준월:ok]`가 있어도 필터는
+`derivation='None'` `type='quantitative'`인 **`[none:기준월:qk]`**를 새로 발급받는다.
+날짜를 연속 축으로 다루기 때문이다. 그 인스턴스가 `viewpoint/highlight`에도 자동 추가된다.
+
+## 컨텍스트 필터 (`관찰_04`) — 속성 하나다
+
+```diff
+- <filter class='categorical' column='[federated.…].[none:품목:nk]'>
++ <filter class='categorical' column='[federated.…].[none:품목:nk]' context='true'>
+```
+
+**diff가 이 한 줄뿐이다.** `<slices>`도 `groupfilter`도 안 바뀐다.
+
+## 데이터 원본 필터 (`관찰_05`) — 자리가 다르다
+
+워크시트가 아니라 **`<datasource>` 안**에 들어간다. `<semantic-values>` 다음 ·
+`<object-graph>` 앞:
+
+```xml
+<column datatype='string' name='[지역]' role='dimension' type='nominal' />
+…
+<filter class='categorical' column='[지역]' filter-group='2'>
+  <groupfilter function='union' user:ui-domain='database'
+               user:ui-enumeration='inclusive' user:ui-marker='enumerate'>
+    <groupfilter function='member' level='[지역]' member='&quot;부산&quot;' />
+    <groupfilter function='member' level='[지역]' member='&quot;서울&quot;' />
+  </groupfilter>
+</filter>
+```
+
+| 워크시트 필터와 다른 점 | |
+|---|---|
+| `column` 표기 | **1단 원시 이름** `[지역]` — 데이터 원본 한정자도 인스턴스 한정자도 없다 |
+| `<slices>` | **없다** |
+| `filter-group` | `'2'`가 붙는다 |
+| 동반 변경 | 대상 필드의 `<column>` 정의가 데이터 원본에 실체화된다 |
+| 워크시트 | **아무것도 안 바뀐다** |
+
 ## filter-group (`57e556a`)
 
 `<filter class='categorical' column='…' filter-group='3'>` — 그룹 번호 속성이 붙는 변형 관찰.
-의미 미상(`추정`: 관련 필터 묶음). 관찰대로만 복제.
+**여전히 미상**(`추정`). 2026-08-10 추가 관찰분:
+
+- 데이터 원본 필터에는 `filter-group='2'`가 붙는다 (`관찰_05`)
+- 워크시트 필터 5건에는 **하나도 안 붙었다** (`관찰_01`~`04`)
+- 실파일에서는 워크시트 필터에도 붙고 값이 3~142로 흩어진다 — 규칙 미해명
+
+관찰대로만 복제한다. 값을 지어내지 않는다.
 
 ## 재저장 검증
 
