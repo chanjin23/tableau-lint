@@ -19,6 +19,9 @@ Tableau는 **로드는 하고 그 설정만 버린다**:
 반대라는 것이 이 규칙의 요점이다: 자리마다 한정 여부가 정해져 있고, 어느 쪽이든
 어기면 그 설정이 버려진다.
 
+다섯 번째는 **정렬**이다 — `computed-sort`·`manual-sort` (⑦-e). 한정자를 빼면 정렬
+하나만 조용히 사라진다.
+
 **전부 WARNING이다** (02 S1-6). 파일은 열린다 — 열리지 않는다고 확신할 때만 ERROR다.
 대신 조용하지 않다: 필터가 사라진 화면은 **틀린 숫자를 보여준다.**
 
@@ -67,6 +70,19 @@ PLACEHOLDER_SURFACES = (("text", "column"), ("rows", None), ("cols", None))
 목록 밖은 검사하지 않는다 — 추측해서 늘리면 그 자리가 통째로 거짓양성이 된다
 (02 S1-6)."""
 
+SORT_SURFACES = (
+    ("computed-sort", "column", "정렬 대상"),
+    ("computed-sort", "using", "정렬 기준"),
+    ("manual-sort", "column", "정렬 대상"),
+)
+"""⑦-e가 보는 자리 — `(요소, 속성, 사람이 읽는 이름)`.
+
+실측(2026-08-12, 실파일 47개): `computed-sort@column` 503 · `@using` 503 ·
+`manual-sort@column` 432가 **전부 한정 표기**이고 비한정은 0건이다.
+
+`shelf-sort-v2@dimension-to-sort`·`@measure-to-sort-by`는 표본이 1건씩뿐이라
+넣지 않았다. `sort`·`alphabetic-sort`·`reference-line`은 코퍼스에 나오지 않는다."""
+
 
 @register
 class RefNotationRule(RuleBase):
@@ -82,6 +98,7 @@ class RefNotationRule(RuleBase):
             self._member_literals(ctx.raw_tree)
             + self._placeholders(ctx.raw_tree)
             + self._qualified_levels(ctx.raw_tree)
+            + self._bare_sorts(ctx.raw_tree)
             + self._bare_parameters(ctx)
         )
         findings.sort(key=lambda f: (f.location, f.message))
@@ -211,6 +228,56 @@ class RefNotationRule(RuleBase):
                     fix=f"한정자를 뗀다: `level='{bare}'`.",
                 )
             )
+        return out
+
+    def _bare_sorts(self, root: Any) -> list[Finding]:
+        """⑦-e — 정렬 참조에는 데이터소스 한정자를 붙인다.
+
+        ⑦-d(`groupfilter@level`)와 방향이 반대다. 같은 워크시트 안에서 같은 필드가
+        필터 `level`에는 비한정으로, 정렬 `column`에는 한정으로 적힌다:
+
+        ```xml
+        <computed-sort column='[federated.abc].[none:C_구분:nk]'
+                       direction='ASC' using='[federated.abc].[min:scrn_seq:qk]' />
+        ```
+
+        한정자를 빼면 XSD는 통과하고 파일도 열린다. 대신 **정렬만 버려진다**:
+
+        ```
+        'SEC05_그리드표' 오류:
+        [none:Calculation_1238633066082307:nk] 필드가 정의되지 않았습니다.
+        정렬 지정을 무시합니다.
+        ```
+
+        경고를 닫으면 나머지는 전부 정상 동작하므로 **틀린 순서의 표가 그대로
+        배포된다** (2026-08-12 MA_011 실측 — 레시피 14 예제가 비한정이었다).
+
+        실측은 `SORT_SURFACES` 참조. 규칙 ⑪(`shelf.refs`)이 같은 속성을 보지만
+        묻는 것이 다르다 — ⑪은 *가리키는 필드가 있는가*이고, 비한정 표기도
+        필드 이름 자체는 해소되므로 침묵한다.
+        """
+        out: list[Finding] = []
+        for tag, attr, role in SORT_SURFACES:
+            for el in root.iter(tag):
+                value = el.get(attr)
+                if value is None or not value.startswith("[") or _HAS_DS_PREFIX.match(value):
+                    continue
+                out.append(
+                    Finding(
+                        severity=Severity.WARNING,
+                        rule_id=self.id,
+                        location=_path_of(el),
+                        line=el.sourceline,
+                        message=(
+                            f"{role} `{value}`({tag}@{attr})에 데이터소스 한정자가 없다 — "
+                            "Tableau가 그 필드를 찾지 못하고 **정렬을 무시한다**"
+                        ),
+                        fix=(
+                            f"`[<데이터소스 이름>].{value}`로 쓴다 "
+                            "(그 워크시트의 `view/datasources`에 있는 이름)."
+                        ),
+                    )
+                )
         return out
 
     def _bare_parameters(self, ctx: ValidationContext) -> list[Finding]:

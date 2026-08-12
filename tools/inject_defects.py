@@ -336,6 +336,43 @@ def _r23_drop_filter_link(root: Any) -> str | None:
     return None
 
 
+def _r26_unqualify_sort(root: Any) -> str | None:
+    """R26 — 정렬 참조에서 데이터소스 한정자를 뗀다 → 정렬 지정이 무시된다."""
+    surfaces = (("computed-sort", "column"), ("computed-sort", "using"), ("manual-sort", "column"))
+    for tag, attr in surfaces:
+        for el in root.iter():
+            if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != tag:
+                continue
+            value = el.get(attr) or ""
+            if not value.startswith("[") or "]." not in value:
+                continue
+            bare = value.split("].", 1)[1]
+            el.set(attr, bare)
+            return f"{tag}@{attr} {value} → {bare}"
+    return None
+
+
+def _r27_double_aggregate(root: Any) -> str | None:
+    """R27 — 워크시트가 쓰는 `usr:` 인스턴스의 파생을 `Sum`으로 바꾼다 → `SUM(SUM(…))`.
+
+    수식은 건드리지 않는다 — 이 결함은 **수식과 파생의 불일치**이지 수식의 문제가 아니다.
+    """
+    for worksheet in root.iter():
+        if not isinstance(worksheet.tag, str) or fcp.strip_prefix(worksheet.tag) != "worksheet":
+            continue
+        for ci in worksheet.iter():
+            if not isinstance(ci.tag, str) or fcp.strip_prefix(ci.tag) != "column-instance":
+                continue
+            if ci.get("derivation") != "User":
+                continue
+            column = (ci.get("column") or "").strip("[]")
+            before = ci.get("name") or ""
+            ci.set("derivation", "Sum")
+            ci.set("name", f"[sum:{column}:qk]")
+            return f"{before}의 derivation User → Sum"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -441,6 +478,20 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + 경고 없음 · 동작의 필드 열이 비고 아무 필터도 걸리지 않는다",
         source="docs/05-xsd-spike.md F5-h",
         mutate=_r23_drop_filter_link,
+    ),
+    Recipe(
+        id="R26-unqualify-sort",
+        rule="ref.notation",
+        expected="열림 + 경고: 필드가 정의되지 않았습니다. 정렬 지정을 무시합니다",
+        source="docs/06-rule-candidates.md R26 (2026-08-12 MA_011 실측)",
+        mutate=_r26_unqualify_sort,
+    ),
+    Recipe(
+        id="R27-double-aggregate",
+        rule="calc.aggregation",
+        expected="열림 + 알약이 빨개지고 그 시트가 렌더링되지 않는다",
+        source="docs/06-rule-candidates.md R27 (2026-08-12 MA_011 실측)",
+        mutate=_r27_double_aggregate,
     ),
 )
 

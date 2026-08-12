@@ -38,7 +38,10 @@ datetime 매개변수는 `<members>` 없이 `formula='#2026-01-01 00:00:00#'` �
 ## 불변 조건
 
 1. **쓰는 워크시트마다** `<datasource-dependencies datasource='Parameters'>`에 이 `<column>`
-   사본이 들어간다 — **단 `<members>`는 빼고** `<calculation>`만 (`b13bc5a`)
+   사본이 들어간다 — **단 `<members>`는 빼고** `<calculation>`만 (`b13bc5a`).
+   **거기서 끝이 아니다** — 그 `<column>`의 `source-field`·`default-value-field`가 가리키는
+   계산 필드도 **원본 데이터 원본 쪽 의존성에 함께 복제한다.** 뷰에서 쓰지 않아도 넣는다
+   (MA_011 260811 재저장 검증: AI가 빠뜨린 `default-value-field` 대상을 Tableau가 채워 넣었다)
 2. 계산 수식에서 참조는 반드시 `[Parameters].[매개 변수 N]` 한정 —
    한정 없으면 계산이 통째로 깨진다 (층 3, lint ⑦-c)
 3. **삭제 시** 대시보드의 `zone[@type-v2='paramctrl']`도 함께 지운다 (`57e556a` — 동시 삭제 관찰).

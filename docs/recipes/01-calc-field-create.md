@@ -29,6 +29,28 @@
 1. **워크시트가 이 필드를 쓰면** 그 워크시트의 `view/datasource-dependencies`에
    같은 `<column>`(+ 필요 시 `<column-instance>`)이 **복제돼 들어가야 한다** (`b13bc5a`).
    수식이 참조만 해도(선반에 없어도) 원본 컬럼이 의존성에 올라온다 (`35db682`)
+1-a. **`<column>` 정의가 없는 원본 필드**(= `folders-common`·`metadata-record`에만 있는
+   필드)를 워크시트가 쓰면, 워크시트 의존성에 **`caption` 없는** `<column>`을 만든다.
+   데이터 원본 쪽에는 아무것도 생기지 않는다 (MA_011 260812 UI 관찰):
+
+   ```xml
+   <datasource-dependencies datasource='federated.…'>
+     <column datatype='integer' name='[scrn_seq]' role='measure' type='quantitative' />
+     <column-instance column='[scrn_seq]' derivation='Min' name='[min:scrn_seq:qk]'
+                      pivot='key' type='quantitative' />
+   </datasource-dependencies>
+   ```
+
+   `datatype`/`role`/`type`은 `metadata-record`의 `<local-type>`에서 유도한다
+   (`scrn_seq`는 `BIG_INT` → `integer`·`measure`·`quantitative`).
+   데이터 원본에 `<column>` 정의가 **있는** 필드는 `caption='Accs Code'`처럼 caption이
+   복제되므로, caption 유무가 두 부류를 가른다.
+
+1-b. **워크시트가 매개변수를 참조하면 그 매개변수 `<column>` 복제로 끝이 아니다.**
+   `source-field`·`default-value-field`가 가리키는 계산 필드도 **원본 데이터 원본 쪽
+   의존성에 함께 복제해야 한다** — 뷰에서 쓰지 않아도 넣는다 (MA_011 재저장 검증에서
+   Tableau가 `default-value-field` 대상을 채워 넣었다).
+
 2. **참조 0이어도 유효** — 어떤 시트도 안 쓰는 필드는 그냥 존재해도 된다 (`98fb49c`)
 3. **빈 껍데기도 유효** — `formula=''`로 저장했다가 나중에 채우는 흐름이 무해하다 (`7f4e665`→`35db682`)
 4. 다른 필드 참조는 `[name]` 표기 (calc 안에서는 `[Calculation_...]` — 07 G8의 2종 표기 주의).
@@ -38,8 +60,11 @@
 ## 재저장 검증 (레시피가 정본인가)
 
 `b13bc5a`(UI 저장 원본) 형태 그대로 쓰면 정규화 대상 아님. `23690bc`에서 AI 저작분
-"한 글자도 안 바뀜" 확인. 주의: 의존성 `column-instance` **순서**는 컬럼 정의 순서를
-따른다 — 어기면 Tableau가 재배열한다 (`227b603` 정규화 1)
+"한 글자도 안 바뀜" 확인. 주의: 의존성 `column-instance` **순서**는 Tableau가 재배열한다
+(`227b603` 정규화 1). 다만 **컬럼 정의 순서를 따르지는 않는다** — MA_011 재저장 실측에서
+`<column>` 하나가 `[none:]` 인스턴스 뒤·`[usr:]` 인스턴스 앞에 끼어 남았고, 같은 파일의
+다른 워크시트에서도 같은 배치가 재현됐다. **규칙은 아직 모른다.** 내용이 보존되므로
+저작 시 순서를 맞추려 애쓸 필요 없다 — 정규화 1회를 감수한다 (노이즈)
 
 **삽입 위치 (E2E 2026-08-06 확인)** — 데이터소스의 `<column>` 정의는
 **`name` 속성 문자열 오름차순**으로 정렬돼 있다. 아무 데나 끼우면 내용은 그대로 두고

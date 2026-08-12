@@ -226,6 +226,67 @@ def test_lookalike_levels_are_not_reported(rule: RefNotationRule, body: str) -> 
     assert [f for f in findings if "level" in f.message] == []
 
 
+@pytest.mark.parametrize(
+    ("body", "role"),
+    [
+        pytest.param(
+            "<computed-sort column='[none:C_구분:nk]' direction='ASC' "
+            "using='[federated.abc].[min:scrn_seq:qk]' />",
+            "정렬 대상",
+            id="computed-sort@column",
+        ),
+        pytest.param(
+            "<computed-sort column='[federated.abc].[none:C_구분:nk]' direction='ASC' "
+            "using='[min:scrn_seq:qk]' />",
+            "정렬 기준",
+            id="computed-sort@using",
+        ),
+        pytest.param(
+            "<manual-sort column='[:Measure Names]' direction='ASC'><dictionary />"
+            "</manual-sort>",
+            "정렬 대상",
+            id="manual-sort@column",
+        ),
+    ],
+)
+def test_unqualified_sort_reference_is_a_warning(
+    rule: RefNotationRule, body: str, role: str
+) -> None:
+    """⑦-e — 한정자를 빼면 Tableau가 **정렬 지정을 무시한다** (2026-08-12 MA_011 실측).
+
+    실측 503 : 503 : 432 대 비한정 0건.
+    """
+    findings = [f for f in rule.check(make_ctx(make_twb(extra_body=body))) if "정렬" in f.message]
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert findings[0].message.startswith(role)
+    assert findings[0].line is not None
+
+
+def test_qualified_sort_reference_is_silent(rule: RefNotationRule) -> None:
+    """정본 모양. 코퍼스 47개가 전부 이것이다."""
+    body = (
+        "<computed-sort column='[federated.abc].[none:C_구분:nk]' direction='ASC' "
+        "using='[federated.abc].[min:scrn_seq:qk]' />"
+        "<manual-sort column='[federated.abc].[:Measure Names]' direction='ASC'>"
+        "<dictionary><bucket>&quot;[federated.abc].[usr:C_실적:qk]&quot;</bucket></dictionary>"
+        "</manual-sort>"
+    )
+
+    assert rule.check(make_ctx(make_twb(extra_body=body))) == []
+
+
+def test_sort_bucket_text_is_not_a_sort_reference(rule: RefNotationRule) -> None:
+    """`<bucket>`은 **값** 목록이다 — 한정 여부를 여기서 묻지 않는다 (⑪도 같은 이유로 뺐다)."""
+    body = (
+        "<manual-sort column='[federated.abc].[:Measure Names]' direction='ASC'>"
+        "<dictionary><bucket>&quot;[usr:C_실적:qk]&quot;</bucket></dictionary>"
+        "</manual-sort>"
+    )
+
+    assert rule.check(make_ctx(make_twb(extra_body=body))) == []
+
+
 def test_missing_tree_reports_the_skip(rule: RefNotationRule) -> None:
     ctx = make_ctx(make_twb())
     ctx.raw_tree = None

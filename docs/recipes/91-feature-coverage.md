@@ -59,7 +59,7 @@
 | `edit-group-action` + `add-or-remove-marks` + 매니페스트 `GroupAction`·`GroupActionAddRemove` | **55** | **집합 동작** — T3 직결 | **1** |
 | `encodings/lod` (`@column`) | **77** | 마크 **세부 수준** 인코딩. 레시피 13에 아예 없다 | **2** |
 | `field-sort-info`/`field-sort-custom-order` | 30 | 데이터 원본 필드 사용자 지정 정렬 순서 | 3 |
-| `viewpoint/selection-collection` (`tuple-selection` 36 · `node-selection` 27 · `bucket-selection` 38) | 49 | 저장된 **선택 상태**. 신호인지 노이즈인지 미판별 | 4 |
+| ~~`viewpoint/selection-collection`~~ | 49 | **판별 끝 — 신호다.** 저장 시점의 마크 선택 상태가 박제된 것이고, 남아 있으면 최초 로드 시 디밍으로 보인다. 배포본에서는 제거한다 → 레시피 09 (MA_011 260812, 5건 제거로 디밍 소멸·다른 동작 무변화) | ✅ |
 | `repository-location` | 26 | 서버 게시 흔적. 저작 시 써야 하는지 미판정 | 5 |
 | `default-map-tool-selection` 19 · `map-pri` 8 | 19 | 지도 도구·색상 우선순위 | 6 |
 | 매니페스트 `PatternedLineMarks` | 14 | 선 마크 패턴 | 7 |
@@ -83,7 +83,7 @@
 |---|---|---|
 | **페이지 선반** | `pages`·`page` | 01 v2.0 T4가 명시적으로 포함하는 표면인데 표본이 없다 |
 | **참조선·추세선·분포 밴드** | `reference-line`·`trend-lines` | 규칙 ⑪이 표면으로 선언만 해 뒀다 |
-| **총계/소계** | `totals`·`total` | 00-inventory의 `c3ad388`은 속성 수준 관찰이다 — 태그는 없다 |
+| ~~**총계/소계**~~ | ~~`totals`·`total`~~ | **C군에서 내린다** — 태그가 아니라 `<rows>`의 속성이었다(`total='true'`·`onTop='true'`). 00-inventory `c3ad388`의 "속성 수준 관찰"이 맞았다. 형태는 레시피 11에 있다 (MA_011 260812). **총계 계산 방식·행 총합계·소계는 여전히 미관찰** |
 | **스토리** | `story`·`stories` | |
 | **주석** | `annotation` | |
 | **계층(드릴)** | `hierarchy`·`drill-path` | |

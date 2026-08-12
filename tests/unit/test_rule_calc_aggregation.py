@@ -122,6 +122,104 @@ def test_unresolvable_reference_is_reported_as_undecided_not_as_a_violation(
     assert "판정하지 못했다" in (notes[0].reason or "")
 
 
+def _wb_derived(
+    *calcs: Calc, target: str = "C_매출", derivation: str = "Sum", in_worksheet: bool = True
+) -> str:
+    """⑧-b용 — 계산 하나에 집계 파생 인스턴스를 건 워크북."""
+    instance = (
+        f"<column-instance column='[{target}]' derivation='{derivation}' "
+        f"name='[{derivation.lower()}:{target}:qk]' pivot='key' type='quantitative' />"
+    )
+    body = (
+        f"<worksheets><worksheet name='S'><table><view>"
+        f"<datasource-dependencies datasource='federated.abc'>{instance}"
+        f"</datasource-dependencies></view></table></worksheet></worksheets>"
+        if in_worksheet
+        else instance
+    )
+    return make_twb(
+        datasources=(Ds(name="federated.abc", columns=("매출", "idct_val"), calcs=calcs),),
+        extra_body=body,
+    )
+
+
+def test_aggregate_formula_with_an_aggregate_derivation_is_a_warning(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """⑧-b — `SUM(SUM(…))`이 된다. 실측: MA_011에서 알약이 빨개지고 시트가 안 그려졌다."""
+    ctx = ctx_for(tmp_path, _wb_derived(Calc(name="C_매출", formula="SUM([idct_val])")))
+
+    findings = rule.check(ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert "다시 집계했다" in findings[0].message
+    assert "derivation='Sum'" in findings[0].message
+    assert findings[0].line is not None
+
+
+def test_row_level_formula_with_an_aggregate_derivation_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """정본 모양 — 행 수준 계산을 선반에서 `SUM()`으로 올린 것이다."""
+    ctx = ctx_for(
+        tmp_path,
+        _wb_derived(Calc(name="C_매출", formula='IF [매출] = "x" THEN [idct_val] END')),
+    )
+
+    assert rule.check(ctx) == []
+
+
+def test_bare_lod_formula_with_an_aggregate_derivation_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """LOD 결과는 행 수준처럼 쓰인다 — `SUM({ FIXED … })`는 정상이다.
+
+    중첩 LOD를 한 겹만 벗기면 바깥 `AVG(`가 남아 위반으로 보였다 (실측 MA_008 6건).
+    """
+    formula = "{ FIXED [매출] : AVG({ FIXED [매출], [idct_val] : SUM([idct_val]) }) }"
+    ctx = ctx_for(tmp_path, _wb_derived(Calc(name="C_매출", formula=formula)))
+
+    assert rule.check(ctx) == []
+
+
+def test_aggregate_through_a_reference_chain_is_a_warning(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """비율 계산(`[집계A] / [집계B]`)도 집계식이다 — 실측 MA_011 `C_영업이익률`."""
+    ctx = ctx_for(
+        tmp_path,
+        _wb_derived(
+            Calc(name="C_이익", formula="SUM([idct_val])"),
+            Calc(name="C_매출", formula="[C_이익] / SUM([idct_val]) * 100"),
+        ),
+    )
+
+    findings = rule.check(ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+
+
+def test_datasource_only_instance_is_not_reported(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """어느 워크시트도 쓰지 않는 잔재다 — 실측 위반 65건 중 63건이 여기였다."""
+    ctx = ctx_for(
+        tmp_path,
+        _wb_derived(Calc(name="C_매출", formula="SUM([idct_val])"), in_worksheet=False),
+    )
+
+    assert rule.check(ctx) == []
+
+
+def test_aggregate_derivation_on_a_plain_column_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """`SUM([매출액])` — 계산이 아닌 원본 컬럼에 거는 집계는 정상 그 자체다."""
+    ctx = ctx_for(tmp_path, _wb_derived(target="매출"))
+
+    assert rule.check(ctx) == []
+
+
 def test_missing_tree_reports_the_skip(rule: CalcAggregationRule) -> None:
     ctx = make_ctx(make_twb())
     ctx.raw_tree = None

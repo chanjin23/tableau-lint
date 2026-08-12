@@ -27,10 +27,10 @@
 | `xsd.schema` (L-A) | T1 | ERROR/WARNING 혼합 |
 | `named.refs` | T1 — zone·worksheet·viewpoint·window 4자 일치 | ERROR |
 | `manifest.gates` | T1 — 매니페스트 게이트 | ⑥-b ERROR / ⑥-a WARNING |
-| `ref.notation` | T1·T2 — 표기 정합 (⑦-a·b·c·**d**) | ERROR/WARNING |
+| `ref.notation` | T1·T2·T4 — 표기 정합 (⑦-a·b·c·d·**e** 정렬) | ERROR/WARNING |
 | `calc.functions` | T2 — 함수 화이트리스트 | WARNING |
 | `calc.field_refs` | T2 — dangling 참조 | WARNING |
-| `calc.aggregation` | T2 — 사용자 지정 집계 | WARNING |
+| `calc.aggregation` | T2 — 집계 정합 (⑧-a 모자람 · ⑧-b **이중 집계**) | WARNING |
 | `set.definition` | T3 — 집합 정의 | WARNING |
 | `action.refs` | T3 — 동작 배선 참조 | WARNING |
 | `action.shape` | T3 — 동작 배선 **어휘** (명령·param·`<link>` 짝) | WARNING |
@@ -132,6 +132,12 @@ D3은 뷰 그레인을 정적으로 구할 수 있는지부터 정해야 하므�
       `ObjectModelEncapsulateLegacy`·`SchemaViewerObjectModel` 3항목을 **한꺼번에**
       지웠다. 어느 것이 `object-graph`를 게이팅하는지 모른 채 셋 다 요구하고 있다 —
       L4에서 드러난 과요구와 같은 위험이다. 정본에서 하나씩만 뺀 변형 3개를 연다
+- [ ] **L7. 총계·부동 존 관찰 (MA_011 260812에서 절반만 닫혔다)** — 총계가 `<rows>`의
+      `total`·`onTop` 속성이라는 것은 확보했다(레시피 11). 남은 것: **총계 계산 방식**
+      (자동/합계/평균 — "자동"은 기본값이라 아무 XML도 안 남는다. 비율 측정값의 총계가
+      재계산되는지 합산되는지가 여기 달렸다) · 행 총합계(`<cols>` 추정) · 소계 ·
+      **부동(floating) 존**(레시피 16에 패턴 없음. 클릭 하이라이트를 막는 투명 오버레이용).
+      한 저장 = 한 조작으로 받는다
 - [ ] **L6. 실패 층 분류에 빈칸이 있다** — 규칙 ⑭가 잡는 것("열리는데 데이터 원본
       탭에서 앱이 종료")은 `01 v2.0 §4`의 4층 어디에도 없다. 층 1(로드 거부)이
       아닌데 증상은 층 4(빨간 느낌표)보다 무겁다. 층을 늘릴지, 층 1의 변종으로 볼지
@@ -163,7 +169,7 @@ D3은 뷰 그레인을 정적으로 구할 수 있는지부터 정해야 하므�
 ## 검증 파이프라인
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 295 passed, 14 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q     # 306 passed, 14 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .  # All checks passed
 ```
 

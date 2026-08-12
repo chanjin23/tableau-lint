@@ -35,6 +35,17 @@
 - window 복사 시 원본에 붙은 범례 카드(`cards/edge`)가 대상 시트에 안 맞으면 제거 —
   `8fc93fe`는 색상 카드·measures 카드를 빼고 highlight 필드를 교체했다
 
+## 뷰 필드 구성을 바꿀 때 (MA_011 260811·260812)
+
+- `[:Measure Names]`를 선반에 올리면 window `<cards>/<edge name='left'>/<strip>`에
+  `<card type='measures' />`가 **`pages`·`filters`·`marks` 다음**에 추가된다 (레시피 10·11)
+- `<window>/<viewpoint>/<highlight>/<color-one-way>`에는 **이제 뷰에 없는 필드 참조가
+  남는다.** 지워도 된다 — 사람이 다시 저장해도 재생성되지 않았고 경고도 없었다.
+  "Tableau가 재계산한다"가 아니라 **없어도 되는 선택적 블록**이다 (레시피 22)
+- `<selection-collection>/<tuple-selection>`은 저작 산출물이 아니라 **저장 시점의 마크
+  선택 상태**다. 남아 있으면 최초 로드 시 다른 마크가 흐리게(디밍) 보이고 사용자는 이를
+  하이라이트 동작 오류로 오인한다. 배포용 파일에서는 제거한다 (제거 5건, 다른 동작 무변화)
+
 ## 삭제 여파
 
 - 동작의 exclude 목록에서 그 시트 항목 제거 (`c681161` −5) — 레시피 07·08

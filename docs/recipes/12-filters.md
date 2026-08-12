@@ -66,6 +66,31 @@ AI 저작 시: 관찰된 조합 중 하나를 그대로 쓴다. 섞지 말 것(`
 - `groupfilter@level`은 **1단 인스턴스 표기**(`[none:품목:nk]`)다 — `filter@column`의
   2단 표기와 다르다 (07 G8 · 규칙 ⑦-d)
 
+## NULL 제외 — `except` + `level-members` (MA_011 260812)
+
+계산 필드가 `NULL`을 돌려주는 행을 빼는 필터. 실무에서 매우 흔한데 위 `union`/`member`
+계열과 형태가 다르다.
+
+```xml
+<filter class='categorical' column='[federated.…].[none:Calculation_1238633066082307:nk]'>
+  <groupfilter function='except'
+               user:ui-domain='relevant' user:ui-enumeration='exclusive' user:ui-marker='enumerate'>
+    <groupfilter function='level-members' level='[none:Calculation_1238633066082307:nk]' />
+    <groupfilter function='member'        level='[none:Calculation_1238633066082307:nk]' member='%null%' />
+  </groupfilter>
+</filter>
+```
+
+읽는 법: `except(전체 멤버, {null})` — **첫 자식이 피감수**, 나머지가 감수.
+NULL 멤버는 `member='%null%'`로 쓴다(따옴표 없음).
+
+`user:` 3속성이 포함형과 다르다:
+
+| | `ui-domain` | `ui-enumeration` |
+|---|---|---|
+| 포함형(`member`/`union`) | `database` | `inclusive` |
+| **제외형(`except`)** | **`relevant`** | **`exclusive`** |
+
 ## 측정값 범위 · 날짜 범위 (`관찰_02`·`03`)
 
 ```xml

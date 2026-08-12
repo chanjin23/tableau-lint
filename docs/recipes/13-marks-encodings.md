@@ -28,6 +28,16 @@ pane마다 따로다 — 마크 카드 분리 상태(레시피 11)면 pane별로
 
 ## 마크 레이블·크기
 
+- 텍스트 마크의 기본 쌍 — 빠뜨리면 Tableau가 채운다. 정본으로 넣어 두는 편이
+  정규화 0에 가깝다 (MA_011 재저장 검증 · 같은 파일 카드 시트 42개가 전부 이 형태):
+
+  ```xml
+  <style><style-rule element='mark'>
+    <format attr='mark-labels-show' value='true' />
+    <format attr='mark-labels-cull' value='true' />
+  </style-rule></style>
+  ```
+
 - `pane/style-rule[@element='mark']/format[@attr='mark-labels-show']` `'true'|'false'`
 - 크기 조정 해제: `pane/+<mark-sizing @mark-sizing-setting='marks-scaling-off'>` (`b13bc5a` — 간트에 적용 관찰)
 - 크기값: `pane/style/style-rule[@element='mark']/format[@attr='size']` (`b6256cf`, GanttBar size 1.747 `23690bc`)

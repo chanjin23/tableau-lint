@@ -23,6 +23,22 @@
 2. `column-instance @derivation` `'User'`↔`'Attribute'` — 인스턴스 name도 `[usr:…:qk]`↔`[attr:…:qk]`
 3. 그 인스턴스를 참조하는 `filter`/`slices`도 새 표기로 함께
 
+## 행 수준 ↔ 집계 전환 — 인스턴스 파생도 함께 고친다 ★ (MA_011 260812)
+
+수식을 `IF … THEN [x] END`에서 `SUM(IF … THEN [x] END)`로 바꾸면 그 필드의 모든
+`column-instance@derivation`을 함께 고쳐야 한다.
+
+| 수식 | 파생 | 인스턴스 name |
+|---|---|---|
+| 행 수준 | `derivation='Sum'` | `[sum:…:qk]` |
+| 집계 | `derivation='User'` | `[usr:…:qk]` |
+
+고치지 않으면 `SUM(SUM(…))`이 되어 알약이 **빨개지고 시트가 렌더링되지 않는다.**
+XSD도 lint ②도 통과한다 — 수식은 멀쩡하고 참조도 해소되기 때문이다 (lint ⑧-b가 잡는다).
+
+인스턴스 `name`이 바뀌므로 이를 참조하는 선반·`filter@column`·`slices/column`·
+`style-rule/format@field`·`encodings/*@column`도 **전부 교체**한다.
+
 ## 개명
 
 `@caption`만 변경. **`name`은 유지 → 참조가 안 깨진다** (`e6a02cc` C_B_재고→C_B_월별재고추이).

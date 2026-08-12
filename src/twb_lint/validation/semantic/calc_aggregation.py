@@ -1,4 +1,9 @@
-"""L-B rule ⑧: 사용자 지정 집계(`usr:`)로 올린 계산의 집계 정합.
+"""L-B rule ⑧: 계산필드 수식과 `column-instance@derivation`의 집계 정합.
+
+방향이 둘이다. ⑧-a는 **집계가 모자란** 쪽, ⑧-b는 **집계가 겹친** 쪽이다.
+같은 두 표면(수식 · 파생)을 교차 검사하므로 한 규칙에 둔다.
+
+## ⑧-a — 사용자 지정 집계(`usr:`)로 올린 계산의 집계 정합
 
 Tableau는 계산필드를 뷰에 올릴 때 두 가지로 직렬화한다:
 
@@ -24,6 +29,29 @@ MA_003 매출표의 `C_L_전체`(`"전체"`)·`C_L_세부현황`은 체인 전�
 ⚠️ **모르면 침묵한다.** 참조를 펼치지 못했으면(외부 필드·미지 표기) 그 계산은 판정하지
 않고 건너뛴 사실을 `note_partial`로 보고한다. 집계 함수 목록이 불완전하면 거짓양성이
 나는 구조라, 판정 불가를 위반으로 읽지 않는다.
+
+## ⑧-b — 집계식에 집계 파생을 다시 걸었다 (이중 집계)
+
+반대 방향이다. 수식이 이미 집계인데 `derivation="Sum"` 같은 집계 파생을 얹으면
+`SUM(SUM(…))`이 되어 그 필드가 **빨간 알약**이 되고 시트가 렌더링되지 않는다.
+
+```xml
+<column name='[C_매출]'><calculation formula='SUM(IF … THEN [idct_val] END)' /></column>
+<column-instance column='[C_매출]' derivation='Sum' name='[sum:C_매출:qk]' />
+```
+
+**수식을 행 수준에서 집계로 고칠 때 인스턴스가 따라오지 않아서** 생긴다 (2026-08-12
+MA_011 실측). 저작 시점에는 행 수준이라 `[sum:…]`이 맞았고, 나중에 수식만 `SUM(…)`으로
+바꾸면서 파생이 남았다. 규칙 ⑧-a도 ②도 못 잡는다 — 수식은 멀쩡하고 참조도 해소된다.
+
+**워크시트에 등재된 인스턴스만 본다.** 실측(2026-08-12, 실파일 47개): 위반 65건 중
+63건이 데이터소스에만 있고 어느 워크시트도 쓰지 않는 **잔재**다. 잔재까지 세면
+정상본이 시끄러워지고(AC7의 취지) 증상도 없다 — 빨간 알약은 그 인스턴스를 실제로
+쓰는 시트에서만 난다.
+
+남는 반례는 2건, `태블로판차분석` 한 계보뿐이다(`SUM({ FIXED … })`에 `sum:`).
+그 파일은 규칙 ⑪에서도 dangling 28건이 나온 파일이라 진짜 결함일 가능성이 높지만,
+확인 전까지는 **WARNING**이다 (02 S1-6).
 """
 
 from __future__ import annotations
@@ -57,6 +85,17 @@ AGGREGATE_FUNCTIONS = frozenset(
 """집계 문맥을 만드는 함수. `data/functions/`의 화이트리스트는 집계 여부를 구분하지
 않으므로 여기 따로 둔다 (출처: Tableau 2026.1 함수 분류 + 실파일 61개 실측)."""
 
+AGGREGATE_DERIVATIONS = frozenset(
+    {
+        "Sum", "Avg", "Min", "Max", "Count", "CountD", "Median",
+        "Stdev", "StdevP", "Var", "VarP", "Attr",
+    }
+)
+"""집계를 **거는** 파생. `User`(수식이 스스로 집계)와 `None`·`Month` 등은 아니다.
+
+⑧-b가 쓴다. 실파일 47개에 실제로 나온 것은 `Sum`·`Attribute` 계열이지만, 목록을
+좁히면 `Avg`로 쓴 같은 결함을 놓친다 — 여기 있는 것은 전부 집계 함수 이름이다."""
+
 _LOD_BLOCK = re.compile(r"\{[^{}]*\}")
 """LOD 표현식. 안쪽 집계는 집계로 치지 않는다 — 위 독스트링 참조."""
 
@@ -82,6 +121,27 @@ class CalcAggregationRule(RuleBase):
 
         known = _known_fields(ctx)
         undecided: list[str] = []
+        out = self._missing_aggregate(ctx, formulas, known, undecided)
+        out += self._double_aggregate(ctx, formulas, known, undecided)
+
+        if undecided:
+            # 판정 못 한 것을 조용히 넘기면 "전부 검사했다"로 읽힌다 (02 S5).
+            ctx.note_partial(
+                self.id,
+                f"참조를 끝까지 펼치지 못해 {len(set(undecided))}종은 판정하지 못했다 "
+                f"({', '.join(sorted(set(undecided))[:5])})",
+                scope="aggregation-undecided",
+            )
+        return out
+
+    def _missing_aggregate(
+        self,
+        ctx: ValidationContext,
+        formulas: dict[str, str],
+        known: set[str],
+        undecided: list[str],
+    ) -> list[Finding]:
+        """⑧-a — `usr:`로 올렸는데 수식에 집계가 없다."""
         out: list[Finding] = []
         for el, name in _user_aggregations(ctx.raw_tree):
             formula = formulas.get(name)
@@ -109,14 +169,43 @@ class CalcAggregationRule(RuleBase):
                     ),
                 )
             )
+        return out
 
-        if undecided:
-            # 판정 못 한 것을 조용히 넘기면 "전부 검사했다"로 읽힌다 (02 S5).
-            ctx.note_partial(
-                self.id,
-                f"참조를 끝까지 펼치지 못해 {len(undecided)}종은 판정하지 못했다 "
-                f"({', '.join(sorted(undecided)[:5])})",
-                scope="aggregation-undecided",
+    def _double_aggregate(
+        self,
+        ctx: ValidationContext,
+        formulas: dict[str, str],
+        known: set[str],
+        undecided: list[str],
+    ) -> list[Finding]:
+        """⑧-b — 집계식에 집계 파생(`sum:` 등)을 다시 걸었다."""
+        out: list[Finding] = []
+        for el, name, derivation in _view_aggregate_instances(ctx.raw_tree):
+            if name not in formulas:
+                continue  # 계산이 아닌 원본 컬럼 — `SUM([매출액])`은 정상이다
+            verdict = _chain_has_aggregate(name, formulas, known)
+            if verdict is None:
+                undecided.append(name)
+                continue
+            if not verdict:
+                continue
+            out.append(
+                Finding(
+                    severity=Severity.WARNING,
+                    rule_id=self.id,
+                    location=_path_of(el),
+                    line=el.sourceline,
+                    message=(
+                        f"`{name}`는 이미 집계식인데 `derivation='{derivation}'`으로 "
+                        "다시 집계했다 — 필드가 **빨간 알약**이 되고 그 시트가 "
+                        "렌더링되지 않는다"
+                    ),
+                    fix=(
+                        "`derivation='User'` · `name='[usr:…:qk]'`로 바꾸고, 그 인스턴스를 "
+                        "가리키는 선반·필터·`slices`·`style-rule/format@field`·"
+                        "`encodings` 참조도 함께 교체한다."
+                    ),
+                )
             )
         return out
 
@@ -143,6 +232,27 @@ def _user_aggregations(root: Any) -> list[tuple[Any, str]]:
         if name and name not in seen:
             seen.add(name)
             out.append((ci, name))
+    return out
+
+
+def _view_aggregate_instances(root: Any) -> list[tuple[Any, str, str]]:
+    """**워크시트에 등재된** 집계 파생 인스턴스 → (요소, 대상 계산 이름, 파생).
+
+    데이터소스에만 있는 인스턴스는 빼는 것이 이 함수의 요점이다 — 실측 위반 65건 중
+    63건이 그 잔재였다 (⑧-b 독스트링). 이름당 첫 자리만 보고한다.
+    """
+    seen: set[tuple[str, str]] = set()
+    out: list[tuple[Any, str, str]] = []
+    for worksheet in root.iter("worksheet"):
+        for ci in worksheet.iter("column-instance"):
+            derivation = ci.get("derivation") or ""
+            if derivation not in AGGREGATE_DERIVATIONS:
+                continue
+            name = (ci.get("column") or "").strip("[]")
+            if not name or (name, derivation) in seen:
+                continue
+            seen.add((name, derivation))
+            out.append((ci, name, derivation))
     return out
 
 
@@ -179,8 +289,7 @@ def _chain_has_aggregate(
     if formula is None:
         return None
 
-    outside_lod = _LOD_BLOCK.sub(" ", formula)
-    if AGGREGATE_FUNCTIONS & extract(outside_lod).functions:
+    if AGGREGATE_FUNCTIONS & extract(_strip_lod(formula)).functions:
         return True
 
     unresolved = False
@@ -197,6 +306,20 @@ def _chain_has_aggregate(
             unresolved = True
         # `known`에 있는 비계산 필드(원본 컬럼·매개변수)는 집계가 아니다 → 그냥 넘어간다
     return None if unresolved else False
+
+
+def _strip_lod(formula: str) -> str:
+    """LOD 블록을 **중첩까지** 지운다.
+
+    한 번만 치환하면 `{ FIXED a : AVG({ FIXED a,b : SUM(…) }) }`에서 안쪽만 지워지고
+    바깥 `AVG(`가 남아 집계로 읽힌다. 실측에서 MA_008의 `C_목표값`이 정확히 이 모양이라
+    ⑧-b가 정상 필드 6건을 위반으로 셌다 (2026-08-12).
+    """
+    prev = None
+    while prev != formula:
+        prev = formula
+        formula = _LOD_BLOCK.sub(" ", formula)
+    return formula
 
 
 def _last_name(raw: str) -> str:

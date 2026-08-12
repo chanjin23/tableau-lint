@@ -38,9 +38,43 @@ Tableau 기본(Tableau Book 9pt)은 파일에 문자열로 존재하지 않는�
 `@field`로 특정 머리글만. 머리글 행 높이는 글꼴에서 파생 — 나란한 시트끼리
 머리글 서식이 다르면 행이 어긋난다 (`c6bdf15` — 2pt 차이 관찰).
 
-- 머리글 표시 해제: `style-rule[@element='label']/format[@attr='display'][@field='…']='false'` (`9cac21f`)
 - 소계 테두리: `style-rule[@element='header']/format[@attr='border-color'][@data-class='subtotal']` (`9cac21f`)
-- 셀 숫자 형식: `style-rule[@element='cell']/format[@attr='text-format']` (억/% 관찰, `146f488`)
+
+## 셀 숫자 서식 — `text-format` (`146f488` · MA_011 260811 재저장 무수정 수용)
+
+```xml
+<style>
+  <style-rule element='cell'>
+    <format attr='text-format' field='[<ds>].[usr:Calculation_A:qk]'
+            value='n#,##0.0;-#,##0.0' />
+  </style-rule>
+</style>
+```
+
+- `value` 문법: `양수 서식;음수 서식`. 선두 `n`이 붙는다.
+  접미 문자열은 따옴표로 — `n#,##0.0&quot;%&quot;;-#,##0.0&quot;%&quot;`
+- `@field`로 필드별 지정. `@field` 없이 쓰면 시트 전역
+- MA_011에서 7건 전부 재저장 무수정 수용 — 이 문법이 정본이다
+
+## 필드 **레이블** 숨김 vs 필드 **머리글** 숨김 — 다른 표면이다 ★
+
+이름이 비슷해서 혼동된다 (MA_011 260812 UI 관찰로 두 개가 한 시트에서 같이 나왔다).
+
+| 감추는 대상 | XML |
+|---|---|
+| 필드 **레이블** (표 좌상단 필드명) | `style-rule[@element='worksheet']` + `display-field-labels` + `@scope` |
+| 필드 **머리글** (각 행/열의 멤버명) | `style-rule[@element='label']` + `display` + `@field` (`9cac21f`) |
+
+```xml
+<style-rule element='worksheet'>
+  <format attr='display-field-labels' scope='cols' value='false' />
+  <format attr='display-field-labels' scope='rows' value='false' />
+</style-rule>
+```
+
+`scope`는 `rows`/`cols` **쌍**을 받는다. `rows`는 AI가 근거 없이 쓴 값이었는데
+① 재저장에서 무수정 수용되고 ② 사람이 UI로 만든 시트에서도 같은 형태가 나와 **확정됐다.**
+(`stroke-size`·`line-visibility`도 같은 쌍을 쓴다.)
 
 ## 불변 조건 (일괄 변경 시 제외 규칙 — `8950148`·`d13373e` 판단)
 

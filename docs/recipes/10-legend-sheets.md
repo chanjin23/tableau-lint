@@ -36,6 +36,9 @@
 - `strip@size`도 함께 조정 (160→199 관찰)
 - 색상 범례 카드 제거 = 해당 `<card>` 삭제
 
+`<card type='measures' />`는 사람이 만드는 것이 아니라 **`[:Measure Names]`를 선반에
+올리면 따라온다** — `pages`·`filters`·`marks` 다음 자리 (MA_011 재저장 검증, 레시피 11).
+
 ## 재저장 검증
 
 AI 저작 범례 시트 3건 수용 (`6154648` `8df7c57`). twb-lint: `named.refs` · `action.refs`(⑩).
