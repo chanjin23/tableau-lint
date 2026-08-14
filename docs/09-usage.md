@@ -42,11 +42,15 @@ uv run twb-lint validate path/to/workbook.twbx   # CLI
 
 ### 등록
 
-Claude Code:
+Claude Code — **venv 실행파일 직접 등록**:
 
 ```bash
-claude mcp add twb-lint -- uv run --directory /path/to/tableau-lint twb-lint-mcp
+claude mcp add --scope user twb-lint -- /path/to/tableau-lint/.venv/Scripts/twb-lint-mcp.exe
 ```
+
+`uv run` 경유 등록은 쓰지 않는다 — 매 세션 로컬 패키지를 재빌드·재설치해서 서버 기동에
+~17초 걸린다(실측, 2026-08-14). venv 직접 실행은 ~1초. 의존성(`pyproject.toml`) 변경 후에만
+`uv sync` 한 번으로 venv를 갱신한다. 코드 수정은 editable 설치라 자동 반영.
 
 `uv`가 차단된 머신(Smart App Control):
 

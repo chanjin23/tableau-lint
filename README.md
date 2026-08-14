@@ -40,11 +40,13 @@ uv run twb-lint validate path/to/workbook.twbx   # CLI
 uv run twb-lint-mcp                              # MCP stdio 서버
 ```
 
-MCP 등록 (Claude Code):
+MCP 등록 (Claude Code) — **venv 실행파일 직접 등록** (`uv run` 경유는 매 세션 로컬 패키지 재빌드·재설치로 기동에 ~17초 걸린다):
 
 ```bash
-claude mcp add twb-lint -- uv run --directory /path/to/tableau-lint twb-lint-mcp
+claude mcp add --scope user twb-lint -- /path/to/tableau-lint/.venv/Scripts/twb-lint-mcp.exe
 ```
+
+의존성(`pyproject.toml`) 변경 후에는 `uv sync` 한 번으로 venv 갱신. 코드 수정은 editable 설치라 자동 반영.
 
 | MCP 도구 | 하는 일 |
 |---|---|
