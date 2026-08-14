@@ -17,7 +17,16 @@ from twb_lint import inspect as inspector
 from twb_lint.io import twbx
 from twb_lint.validation import engine
 
-mcp = FastMCP("twb-lint")
+mcp = FastMCP(
+    "twb-lint",
+    instructions=(
+        "시나리오별 도구 선택:\n"
+        "- `.twbx`를 다룰 때는 항상 twb_unpack으로 먼저 푼다.\n"
+        "- 조회·질문만이면 twb_inspect만 쓴다 — twb_recipe·twb_validate를 부르지 않는다.\n"
+        "- 생성·편집이면 XML을 쓰기 전에 twb_recipe를 조회하고, 작업 마지막에\n"
+        "  twb_validate로 검증한다. passed=False면 산출물을 내보내지 않는다."
+    ),
+)
 
 # FastMCP는 버전을 받지 않고, 저수준 서버는 비어 있으면 **MCP SDK 버전**으로 채운다.
 # 그대로 두면 호스트가 "twb-lint 1.28.1"을 보게 되어 어떤 검증기가 붙었는지 알 수 없다
@@ -29,6 +38,7 @@ mcp._mcp_server.version = __version__
 def twb_validate(path: str) -> dict[str, Any]:
     """`.twb`/`.twbx`를 2계층(구문+시맨틱) 검증한다.
 
+    생성·편집 작업의 마지막에 부른다. 조회만 할 때는 부르지 않는다.
     반환: {passed, findings:[{severity, rule_id, location, message, fix}]}.
     passed=False면 산출물을 내보내면 안 된다 (mandatory gate).
     """
@@ -50,7 +60,10 @@ def twb_validate(path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def twb_inspect(path: str) -> dict[str, Any]:
-    """`.twb`/`.twbx`의 구조 모델(데이터소스·필드·시트·대시보드)을 반환한다."""
+    """`.twb`/`.twbx`의 구조 모델(데이터소스·필드·시트·대시보드)을 반환한다.
+
+    조회·질문 전용 — 이 경우 twb_recipe·twb_validate는 부르지 않는다.
+    """
     with tempfile.TemporaryDirectory(prefix="twb_lint_") as tmp:
         model = inspector.inspect(Path(path), Path(tmp))
         return {
@@ -80,7 +93,10 @@ def twb_inspect(path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def twb_unpack(path: str, dest: str) -> dict[str, Any]:
-    """`.twbx`를 dest에 풀어 `.twb`와 부속 파일을 얻는다 (.hyper 무손실)."""
+    """`.twbx`를 dest에 풀어 `.twb`와 부속 파일을 얻는다 (.hyper 무손실).
+
+    `.twbx`를 다룰 때는 항상 이 도구로 먼저 푼다.
+    """
     unpacked = twbx.unpack(Path(path), Path(dest))
     return {"twb_path": str(unpacked.twb_path), "root": str(unpacked.root)}
 

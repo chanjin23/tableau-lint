@@ -25,6 +25,15 @@ def test_server_reports_its_own_version() -> None:
     assert server.mcp.name == "twb-lint"
 
 
+def test_server_instructions_route_all_four_tools() -> None:
+    """시나리오 라우팅(열기→unpack, 편집→recipe+validate, 조회→inspect만)은
+    서버 instructions가 유일한 전달 경로다 — 비면 호스트는 docstring만 본다."""
+    instructions = server.mcp.instructions
+    assert instructions
+    for tool in ("twb_unpack", "twb_inspect", "twb_recipe", "twb_validate"):
+        assert tool in instructions
+
+
 def test_validate_returns_the_gate_verdict(tmp_path: Path) -> None:
     src = tmp_path / "wb.twb"
     src.write_text(make_twb(), encoding="utf-8")
