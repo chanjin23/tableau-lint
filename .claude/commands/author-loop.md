@@ -107,13 +107,14 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 
 ## 규칙 카탈로그 — 이 린터가 실제로 내는 `rule_id`
 
-**진단에 나오는 것은 아래 12개뿐이다.** 없는 rule id를 지어내지 않는다.
+**진단에 나오는 것은 아래 13개뿐이다.** 없는 rule id를 지어내지 않는다.
 
 | `rule_id` | 담당 층 | 심각도 | 무엇을 잡나 |
 |---|---|---|---|
 | `input.readable` | 0 | ERROR | 파일 없음·깨진 ZIP·`.twb` 아님·해제 정책 위반 |
 | `xsd.schema` | 1 | ERROR/WARN | 공식 XSD 위반 (자식 순서·열거값·필수 속성) |
 | `manifest.gates` | 1 | ERROR/WARN | 기능 요소를 쓰면서 매니페스트 항목 미선언 |
+| `format.fcp_prefix` | 1 | ERROR/WARN | 신기능 서식을 fcp 접두 없이 맨 `<format>`으로 씀 |
 | `named.refs` | 1 | **ERROR** | zone ↔ worksheet ↔ viewpoint ↔ window 4자 불일치 |
 | `ref.notation` | 2·3 | WARNING | 표기 규약 — 필터 따옴표 · 자리표시자 · **매개변수 한정자** |
 | `calc.functions` | 3 | WARNING | 화이트리스트에 없는 함수 (환각 함수) |
@@ -126,7 +127,7 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 
 ### 진단별 수정 지침
 
-**`input.readable` / `xsd.schema` / `manifest.gates` — 파일이 안 열린다. 최우선.**
+**`input.readable` / `xsd.schema` / `manifest.gates` / `format.fcp_prefix` — 파일이 안 열린다. 최우선.**
 
 - 미이스케이프 문자(`&` `<` `>`)는 계산식에서 `&amp;` `&lt;` `&gt;`로 쓴다.
   `&&`는 `&amp;&amp;`
@@ -137,6 +138,10 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
   기능 요소를 넣으면 `<document-format-change-manifest>`에 대응 항목도 넣어야 한다.
   안 넣으면 XSD는 통과하고 **Tableau가 거부한다** (`D2E8DA72`).
   대응표는 `src/twb_lint/data/manifest_gates.json`
+- **신기능 서식은 요소 이름이 다르다.** 대시보드 모서리 반경은
+  `<_.fcp.DashboardRoundedCorners.true...format attr='corner-radius-top-left'>`이지
+  맨 `<format>`이 아니다 — 맨 이름으로 쓰면 `value '…' not in enumeration`으로 거부된다.
+  XSD는 그 값을 허용하므로 L-A로는 안 보인다 (레시피 15 ★ · 05 F5-j)
 
 **`named.refs` — 시트 하나에 네 자리가 맞아야 한다**
 

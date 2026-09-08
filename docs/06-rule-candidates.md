@@ -649,3 +649,32 @@ C_매출 (지금)  SUM(IF [accs_nm] = "매출" THEN [idct_val] END) ← 집계�
 보고서는 ERROR를 제안했다. 반례 2건이 **골든셋 파일**에 있어 ERROR면 AC7이 즉시 깨진다.
 그 파일은 규칙 ⑪에서도 dangling 28건이 나온 계보라 진짜 결함일 가능성이 높지만,
 Tableau로 확인하기 전까지는 WARNING이다 (`S1-6`).
+
+## R28 — 신기능 서식의 fcp 접두 누락 → ✅ **규칙 ⑮ `format.fcp_prefix`** (2026-09-07)
+
+**증상**: 로드 거부 D2E8DA72 · `value 'corner-radius-top-left' not in enumeration` × 88
+(MA_004 손익계산서 저작본). 린터는 `findings=0`이었다 — AC3 위반.
+
+**성질**: 신기능 서식은 요소 이름에 `_.fcp.<기능>.true...` 접두가 붙는다. 접두를 빼면
+XSD는 통과하지만(값이 `StyleAttribute-ST`에 열거돼 있다) 로더가 거부한다.
+
+**근거** (실파일 254개, 05 F5-j):
+
+| 기능 | 표면 | fcp : 맨 | 심각도 |
+|---|---|---|---|
+| `DashboardRoundedCorners` | `zone-style`/`format[@attr^='corner-radius']` | **11,033 : 0** | **ERROR** — 거부 메시지 실측 |
+| `IndividualControlFormatting` | `style-rule[@element='parameter-ctrl']`/`format[@field]` | **468 : 0** | WARNING — 거부 미실측 |
+
+**뺀 것**: `legend` 계열은 맨 238 : fcp 21로 혼재다. 반례를 이해하기 전에는 규칙화하지
+않는다. `cell`·`label`·`header`·`axis`의 `@field` 서식은 맨 표기가 정본이므로
+"`@field`면 fcp"로 일반화하면 **26,358건이 거짓양성이 된다** — 표면을 기능별로 좁힌 이유다.
+
+**⑥이 왜 못 잡았나**: ⑥-a는 트리에 나타난 fcp 기능을 매니페스트와 대조한다. 접두가
+없으면 기능이 나타나지 않는다 — 볼 대상이 없다. 두 규칙은 방향이 반대이고,
+⑮가 잡아 접두를 붙이면 매니페스트 항목 누락은 그다음에 ⑥-a가 잡는다.
+
+**입력**: 정규화 **전** 원본(`ctx.raw_tree`). 정규화 트리를 쓰면 접두가 지워져
+정상 파일 11,033건이 통째로 위반이 된다 (05 F7 함의 2).
+
+**주입 레시피**: R28 — 정상본에서 `_.fcp.DashboardRoundedCorners.true...format` 하나의
+접두사만 벗긴다. 매니페스트는 건드리지 않는다(선언 쪽은 R1a의 몫).

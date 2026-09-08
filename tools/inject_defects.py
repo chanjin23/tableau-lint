@@ -372,6 +372,22 @@ def _r27_double_aggregate(root: Any) -> str | None:
             return f"{before}의 derivation User → Sum"
     return None
 
+def _r28_strip_corner_radius_prefix(root: Any) -> str | None:
+    """R28 — 모서리 반경 서식에서 fcp 접두사만 벗긴다 → `not in enumeration`.
+
+    매니페스트는 건드리지 않는다. 이 결함은 **표기**의 문제이지 선언의 문제가 아니다
+    (선언 쪽은 R1a가 따로 본다).
+    """
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "format":
+            continue
+        if fcp.feature_of(el.tag) != "DashboardRoundedCorners":
+            continue
+        before = el.tag
+        el.tag = "format"
+        return f"{before}[@attr='{el.get('attr')}'] 접두사 제거"
+    return None
+
 
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
@@ -492,6 +508,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + 알약이 빨개지고 그 시트가 렌더링되지 않는다",
         source="docs/06-rule-candidates.md R27 (2026-08-12 MA_011 실측)",
         mutate=_r27_double_aggregate,
+    ),
+    Recipe(
+        id="R28-strip-corner-radius-prefix",
+        rule="format.fcp_prefix",
+        expected="로드 거부 D2E8DA72: value 'corner-radius-top-left' not in enumeration",
+        source="docs/05-xsd-spike.md F5-j (2026-09-07 MA_004 실측)",
+        mutate=_r28_strip_corner_radius_prefix,
     ),
 )
 

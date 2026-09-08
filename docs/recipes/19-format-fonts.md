@@ -38,6 +38,27 @@ Tableau 기본(Tableau Book 9pt)은 파일에 문자열로 존재하지 않는�
 `@field`로 특정 머리글만. 머리글 행 높이는 글꼴에서 파생 — 나란한 시트끼리
 머리글 서식이 다르면 행이 어긋난다 (`c6bdf15` — 2pt 차이 관찰).
 
+**`label`·`cell`·`header`·`axis`는 맨 `<format>`이 맞다** — 실파일 254개에서
+`@field` 붙은 맨 표기가 각각 10,876 · 11,555 · 2,636 · 1,291건, fcp 접두는 0건이다.
+아래 컨트롤 하나만 예외다.
+
+### 예외 — 매개변수 컨트롤의 필드별 서식은 fcp 접두 (`_.fcp.IndividualControlFormatting`)
+
+```xml
+<style-rule element='parameter-ctrl'>
+  <format attr='font-size' value='10' />                       <!-- 카드 전체: 맨 이름 -->
+  <_.fcp.IndividualControlFormatting.true...format
+      attr='font-size' field='[Parameters].[매개 변수 1]' value='11' />
+</style-rule>
+```
+
+`@field`가 붙는 순간 접두가 필요하다 — **468건 : 맨 표기 0건**. 매니페스트에
+`<_.fcp.IndividualControlFormatting.true...IndividualControlFormatting />`를 넣는다.
+규칙 ⑮가 WARNING으로 잡는다(로드 거부는 미실측 — 상관만 확인됐다).
+
+> `legend` 계열은 맨 238건 : fcp 21건으로 **혼재**다. 어느 쪽이 정본인지 모르므로
+> 규칙에 넣지 않았다. 건드릴 일이 있으면 그 파일의 기존 표기를 따른다.
+
 - 소계 테두리: `style-rule[@element='header']/format[@attr='border-color'][@data-class='subtotal']` (`9cac21f`)
 
 ## 셀 숫자 서식 — `text-format` (`146f488` · MA_011 260811 재저장 무수정 수용)

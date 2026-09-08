@@ -577,6 +577,55 @@ Tableau의 정규 기능이라, 38:0을 규칙으로 만들면 **정상 워크�
 Tableau가 첫 실패에서 멈추기 때문이다. 그래서 한 반복에 한 층만 고친다
 (`/defect-loop`).
 
+### F5-j. 저작본이 신기능 서식을 **맨 이름**으로 썼다 (2026-09-07, 규칙 ⑮)
+
+MA_004 손익계산서 저작본. 린터 `passed=True · findings=0`, Tableau는 거부했다 — AC3 위반.
+
+```
+동작을 완료할 수 없습니다. … 오류 코드: D2E8DA72
+Error(770,70): value 'corner-radius-top-left' not in enumeration
+… 같은 메시지 88건 (모서리 4면 × 22개 존)
+```
+
+**F5의 다른 사례와 형태가 다르다.** 지금까지 게이트 위반은 전부
+`no declaration found for element 'X'`였다 — 요소 자체를 모른다는 말이다. 이번은
+요소(`format`)도 속성(`attr`)도 알지만 **값이 열거에 없다**고 한다. 같은 원인의 다른
+얼굴이다: 매니페스트가 열거값을 게이팅한다. F5-e의 `relation@type='table'`
+(`value 'table' not in enumeration`)과 같은 계열이다.
+
+공식 XSD는 이 값을 **허용한다** — `twb_2026.1.0.xsd` 4688~4692행,
+`StyleAttribute-ST`에 `corner-radius`와 4면이 전부 열거돼 있다. L-A가 통과시킨 이유다.
+
+대조 (실파일 254개):
+
+| 표기 | 건수 | 파일 수 |
+|---|---|---|
+| `<_.fcp.DashboardRoundedCorners.true...format attr='corner-radius…'>` | **11,033** | 252 |
+| `<format attr='corner-radius…'>` | **88** | 1 (거부된 그 파일) |
+
+**11,033 : 0.** 매니페스트 항목 `_.fcp.DashboardRoundedCorners.true...DashboardRoundedCorners`도
+252/254가 갖고 있고 거부된 파일에는 없었다.
+
+같은 방식으로 fcp 접두가 요구되는 표면을 전수로 셌다:
+
+| 기능 | 표면 | fcp : 맨 |
+|---|---|---|
+| `DashboardRoundedCorners` | `zone-style` 안 `format[@attr^='corner-radius']` | **11,033 : 0** |
+| `IndividualControlFormatting` | `style-rule[@element='parameter-ctrl']` 안 `format[@field]` | **468 : 0** |
+| `VConnDownstreamExtractsWithWarnings` | `extract/@user-specific` (속성) | 256 |
+
+대조군으로 `@field` 붙은 다른 서식도 셌다 — `cell` 11,555 · `label` 10,876 ·
+`header` 2,636 · `axis` 1,291건이 **전부 맨 표기**다. 즉 "`@field`면 fcp"가 아니라
+**기능별 표면**이다. `legend`만 맨 238 : fcp 21로 혼재라 규칙에서 뺐다.
+
+**원인은 우리 문서였다.** `docs/recipes/15-zone-style.md`가 모서리 반경을 맨
+`<format>`으로 적어 놨다 — fcp 정규화 **후**의 모양을 그대로 옮긴 것으로 보인다.
+정규화가 접두사를 지운다는 F7 함의 2가 레시피 저작에서 재발한 셈이다.
+
+→ 규칙 ⑮ `format.fcp_prefix` (ERROR). 주입 레시피 R28.
+⑥과 방향이 반대다 — ⑥은 *"fcp를 썼는데 선언이 없다"*, ⑮는 *"fcp로 썼어야 하는데 안 썼다"*.
+접두가 없으면 기능이 트리에 나타나지 않아 **⑥은 볼 대상 자체가 없다.**
+
 ## F6. 부수 관측 — Tableau 설치본에 로더의 실제 XSD가 들어 있다
 
 `C:\Program Files\Tableau\Tableau 2026.1\bin\res\tablangres.rcc` (26MB, Qt 리소스)에

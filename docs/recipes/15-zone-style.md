@@ -27,9 +27,41 @@
 - 여백: `margin-left`·`margin-right`·`margin-top`·`margin-bottom` 개별 속성.
   **일괄 변경 시 면별 지정 존은 제외한다** — 비대칭이 의도다 (`91a21fb` `8950148` 제외 판단)
 - 모서리: `corner-radius-top-left` 등 4면 분리. 좌우 존 2개를 한 카드처럼 보이게 하는 방식
-  (`c0ca652` — 좌존은 left 2면, 우존은 right 2면만 16)
+  (`c0ca652` — 좌존은 left 2면, 우존은 right 2면만 16).
+  **요소 이름이 다르다 — 아래 ★를 반드시 읽는다**
 - **같은 모양의 2표기 존재** — `corner-radius=16` + `corner-radius-top-right=0` 조합을
   Tableau가 면별 지정으로 다시 쓰기도 한다 (`160f5f8`). AI는 면별 표기를 쓰는 게 안전
+
+## ★ 모서리는 맨 `<format>`이 아니다 — fcp 접두 요소다
+
+**모서리 반경만 요소 이름이 다르다.** 다른 서식과 나란히 놓고 같은 `<format>`으로 쓰면
+**파일이 열리지 않는다.**
+
+```xml
+<zone-style>
+  <format attr='border-width' value='1' />                     <!-- 구기능: 맨 이름 -->
+  <_.fcp.DashboardRoundedCorners.true...format
+      attr='corner-radius-top-left' value='16' />              <!-- 신기능: fcp 접두 -->
+</zone-style>
+```
+
+매니페스트에도 짝을 넣는다 (벗긴 이름 알파벳순 삽입 — 레시피 21):
+
+```xml
+<_.fcp.DashboardRoundedCorners.true...DashboardRoundedCorners />
+```
+
+| 표기 | 실파일 254개 |
+|---|---|
+| fcp 접두 | **11,033건** |
+| 맨 `<format>` | **0건** (거부된 저작본 1개의 88건뿐) |
+
+2026-09-07 MA_004 손익계산서가 접두 없이 88건을 써서 로드 거부됐다 —
+`Error(770,70): value 'corner-radius-top-left' not in enumeration` × 88.
+**공식 XSD는 이 값을 허용한다**(`StyleAttribute-ST`) — 게이팅하는 것은 매니페스트다.
+이 문서가 원인이었다: 이전 판이 fcp 정규화 **후**의 모양을 그대로 적어 놨다.
+
+규칙 ⑮ `format.fcp_prefix`가 ERROR로 잡는다.
 
 ## 불변 조건
 
