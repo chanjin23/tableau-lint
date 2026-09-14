@@ -116,7 +116,7 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 | `manifest.gates` | 1 | ERROR/WARN | 기능 요소를 쓰면서 매니페스트 항목 미선언 |
 | `format.fcp_prefix` | 1 | ERROR/WARN | 신기능 서식을 fcp 접두 없이 맨 `<format>`으로 씀 |
 | `named.refs` | 1 | **ERROR** | zone ↔ worksheet ↔ viewpoint ↔ window 4자 불일치 |
-| `zone.shape` | 1 | **ERROR** | 존의 종류가 요구하는 속성 누락 (`paramctrl`에 `mode`) |
+| `zone.shape` | 2 | WARNING | 존의 종류가 요구하는 속성 누락 (`paramctrl`에 `mode`) |
 | `ref.notation` | 2·3 | WARNING | 표기 규약 — 필터 따옴표 · 자리표시자 · **매개변수 한정자** |
 | `calc.syntax` | 3·4 | WARNING | **수식 구조 문법** — 괄호·`{}` 짝 · `IF`/`CASE`↔`END` · `THEN`/`WHEN` 누락 |
 | `calc.functions` | 3 | WARNING | 화이트리스트에 없는 함수 (환각 함수) |

@@ -497,10 +497,11 @@ def _r31_mix_aggregation_levels(root: Any) -> str | None:
 
 
 def _r32_drop_paramctrl_mode(root: Any) -> str | None:
-    """R32 — paramctrl 존에서 `mode`를 지운다 -> 내부 오류 CB5AF9D4로 안 열린다.
+    """R32 — paramctrl 존에서 `mode`를 지운다.
 
-    XSD는 `mode`를 선택 속성으로 선언하므로 L-A가 통과시킨다 — "XSD 통과 ≠ 열린다"의
-    또 하나의 실증이다 (05 F5-n).
+    ⚠️ **증상이 확인되지 않은 레시피다.** CB5AF9D4를 쫓다 나왔으나 `mode`를 채운
+    고침본이 여전히 안 열렸다 (05 F5-n). 모양 불변식(2,475:0)만 선 상태이므로
+    이 레시피는 "규칙이 그 모양을 잡는가"만 검증한다.
     """
     for zone in root.iter():
         if not isinstance(zone.tag, str) or fcp.strip_prefix(zone.tag) != "zone":
@@ -664,7 +665,7 @@ RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R32-drop-paramctrl-mode",
         rule="zone.shape",
-        expected="내부 오류 CB5AF9D4 — 파일이 열리지 않는다",
+        expected="열림 — 증상 미확인. 모양 불변식만 선 규칙이다 (05 F5-n)",
         source="docs/05-xsd-spike.md F5-n (2026-09-14 MA_004 실측)",
         mutate=_r32_drop_paramctrl_mode,
     ),

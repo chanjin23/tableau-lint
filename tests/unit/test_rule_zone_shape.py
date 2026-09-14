@@ -3,8 +3,9 @@
 규칙 ③과 묻는 것이 다르다: ③은 "가리키는 이름이 실재하는가", ⑰은 "그 종류의 존이
 갖춰야 할 것을 갖췄는가". ⑬을 ⑩에서 가른 기준과 같다.
 
-**ERROR인 몇 안 되는 규칙이다** — `paramctrl`에 `mode`가 없으면 파일이 내부 오류
-CB5AF9D4로 열리지 않는다 (05 F5-n). 근거는 실파일 238개에서 2,475 : 0.
+**WARNING이다 — 증상 귀속에 실패했다.** CB5AF9D4를 쫓다 나왔고 처음엔 ERROR였는데,
+`mode`를 채운 고침본이 **여전히 안 열렸다** (05 F5-n). 남은 것은 모양 불변식 하나뿐이다
+— 실파일 238개에서 2,475 : 0. 정상본을 때리지는 않지만 증상을 막는다고 말할 수도 없다.
 """
 
 from __future__ import annotations
@@ -37,16 +38,17 @@ PARAMCTRL = (
 )
 
 
-def test_paramctrl_without_mode_is_an_error(rule: ZoneShapeRule) -> None:
-    """실측: `mode` 없는 paramctrl 존 6개가 들어오자 파일이 안 열렸다 (CB5AF9D4).
+def test_paramctrl_without_mode_is_a_warning(rule: ZoneShapeRule) -> None:
+    """정상본 2,475개는 전부 `mode`를 갖는다 — 모양 불변식이다.
 
-    **ERROR다** — 층 1이다. 정상본 2,475개는 전부 `mode`를 갖는다.
+    **WARNING이다.** 한때 ERROR였으나 `mode`를 채운 고침본이 여전히 안 열려
+    증상 귀속이 깨졌다 (05 F5-n). 상관만으로 게이트를 막지 않는다 (02 S1-6).
     """
     ctx = make_ctx(ctx_for(PARAMCTRL.format(mode="")))
 
     findings = rule.check(ctx)
 
-    assert [f.severity for f in findings] == [Severity.ERROR]
+    assert [f.severity for f in findings] == [Severity.WARNING]
     assert "mode" in findings[0].message
     assert "P_YEAR" in findings[0].message  # 사람이 찾아갈 수 있어야 한다
     assert "compact" in (findings[0].fix or "")
@@ -65,7 +67,7 @@ def test_paramctrl_with_mode_is_silent(rule: ZoneShapeRule, mode: str) -> None:
 def test_other_zone_types_are_not_judged(rule: ZoneShapeRule, type_v2: str) -> None:
     """거짓양성 함정 — 다른 종류의 필수 속성은 **재지 않았다**.
 
-    추측해서 넓히면 ERROR라서 정상 파일을 즉시 막는다 (02 S1-6 · AC7).
+    추측해서 넓히면 그 자리가 통째로 거짓양성이 된다 (02 S1-6 · AC7).
     """
     zone = f"<zone type-v2='{type_v2}' id='9' x='0' y='0' w='1' h='1' />"
 
