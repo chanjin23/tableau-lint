@@ -11,11 +11,17 @@
 
 ```xml
 <filter class='categorical' column='[none:Calculation_4888733706485760:nk]'>
-  <groupfilter function='member' level='[none:…:nk]' member='&quot;true&quot;' … />
+  <groupfilter function='member' level='[none:…:nk]' member='true' … />
 </filter>
 ```
 
-- `column`은 인스턴스 표기. boolean 필터 member는 `'true'`
+- `column`은 인스턴스 표기
+- ⚠️ **`member`의 따옴표는 필드의 `datatype`이 정한다** — boolean은 **맨값**(`member='true'`),
+  string은 **따옴표**(`member='&quot;노트북&quot;'`). 실측 138개 파일:
+  boolean 맨값 5,923 : 따옴표 0 · string 따옴표 5,569 : 맨값 0.
+  boolean을 감싸면 파일은 열리지만 Tableau가 *"필터를 구문 분석하는 동안 오류가
+  발생했습니다. 필터를 무시합니다"*로 **그 필터를 버린다** — 걸러져야 할 행이 남아
+  틀린 숫자가 나온다. 규칙 ⑦-f가 잡는다 (05 F5-k)
 - 멤버 여러 개면 `groupfilter function='union'` 아래 member들.
   **단일 멤버로 좁히면 union 껍데기가 사라지고 member 하나만 남는다** (`e6a02cc`)
 

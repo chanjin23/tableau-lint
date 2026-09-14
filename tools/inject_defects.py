@@ -41,7 +41,7 @@ from lxml import etree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from twb_lint import fcp  # noqa: E402
+from twb_lint import fcp, fieldref  # noqa: E402
 from twb_lint.io import safety  # noqa: E402
 
 Mutator = Callable[[Any], str | None]
@@ -389,6 +389,35 @@ def _r28_strip_corner_radius_prefix(root: Any) -> str | None:
     return None
 
 
+def _r29_quote_boolean_member(root: Any) -> str | None:
+    """R29 — 불리언 필터 member를 따옴표로 감싼다 → 그 필터가 무시된다.
+
+    R16과 **반대 방향의 같은 속성이다**: R16은 필드 참조에서 따옴표를 벗기고,
+    여기는 불리언 리터럴에 따옴표를 씌운다. 어느 쪽이 맞는지는 `level`이 가리키는
+    컬럼의 `datatype`이 정한다 (05 F5-k).
+    """
+    datatypes: dict[str, str] = {}
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "column":
+            continue
+        name, datatype = el.get("name"), el.get("datatype")
+        if name and datatype:
+            datatypes[name.strip("[]")] = datatype
+
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "groupfilter":
+            continue
+        level, member = el.get("level"), el.get("member")
+        if not level or not member or member.startswith('"'):
+            continue
+        ref = fieldref.parse(level)
+        if ref is None or not any(datatypes.get(n) == "boolean" for n in ref.names):
+            continue
+        el.set("member", f'"{member}"')
+        return f"groupfilter[@level='{level}'] member {member} → 따옴표로 감쌈"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -515,6 +544,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="로드 거부 D2E8DA72: value 'corner-radius-top-left' not in enumeration",
         source="docs/05-xsd-spike.md F5-j (2026-09-07 MA_004 실측)",
         mutate=_r28_strip_corner_radius_prefix,
+    ),
+    Recipe(
+        id="R29-quote-boolean-member",
+        rule="ref.notation",
+        expected="열림 + 경고: 필드의 필터를 구문 분석하는 동안 오류 — 필터를 무시합니다",
+        source="docs/05-xsd-spike.md F5-k (2026-09-14 MA_004 손익계산서 실측)",
+        mutate=_r29_quote_boolean_member,
     ),
 )
 

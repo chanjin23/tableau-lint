@@ -22,6 +22,10 @@ Tableau는 **로드는 하고 그 설정만 버린다**:
 다섯 번째는 **정렬**이다 — `computed-sort`·`manual-sort` (⑦-e). 한정자를 빼면 정렬
 하나만 조용히 사라진다.
 
+여섯 번째는 ⑦-a와 **같은 속성의 반대 방향**이다 — `groupfilter@member`의 리터럴
+표기는 `level`이 가리키는 컬럼의 `datatype`이 정한다. 불리언 필드를 따옴표로 감싸면
+필터가 통째로 버려진다 (⑦-f, F5-k).
+
 **전부 WARNING이다** (02 S1-6). 파일은 열린다 — 열리지 않는다고 확신할 때만 ERROR다.
 대신 조용하지 않다: 필터가 사라진 화면은 **틀린 숫자를 보여준다.**
 
@@ -57,6 +61,12 @@ _HAS_DS_PREFIX = re.compile(r"^\[[^\[\]]+\]\.\[")
 `_QUALIFIED_REF`와 달리 전체 일치를 요구하지 않는다 — `[ds].[a].[b]` 같은 값도
 한정된 것으로 봐야 하는데, 그런 모양이 정상본에 없다고 검사에서 빠뜨리면
 바로 그 모양이 규칙의 구멍이 된다."""
+
+_QUOTED_LITERAL = re.compile(r'^".*"$', re.DOTALL)
+"""따옴표로 감싼 리터럴. `groupfilter@member`의 값 표기 두 가지 중 하나다."""
+
+BOOLEAN_DATATYPE = "boolean"
+"""⑦-f가 보는 `datatype`. 이 값일 때만 member가 맨값이어야 한다."""
 
 BARE_PLACEHOLDER = "[Multiple Values]"
 """데이터소스 한정자가 없는 자리표시자 표기.
@@ -100,6 +110,7 @@ class RefNotationRule(RuleBase):
             + self._qualified_levels(ctx.raw_tree)
             + self._bare_sorts(ctx.raw_tree)
             + self._bare_parameters(ctx)
+            + self._boolean_members(ctx)
         )
         findings.sort(key=lambda f: (f.location, f.message))
         if len(findings) > MAX_FINDINGS:
@@ -328,6 +339,98 @@ class RefNotationRule(RuleBase):
                         )
                     )
         return out
+
+
+    def _boolean_members(self, ctx: ValidationContext) -> list[Finding]:
+        """⑦-f — 불리언 필드의 `groupfilter@member`는 따옴표 없는 맨값이어야 한다.
+
+        ⑦-a와 **같은 속성의 반대 방향이다.** ⑦-a는 값으로 쓴 *필드 참조*를 감싸라고
+        하고, 여기는 불리언 *리터럴*을 감싸지 말라고 한다. 어느 쪽인지는 `level`이
+        가리키는 컬럼의 `datatype`이 정한다:
+
+        ```xml
+        <column caption='C_레벨1' datatype='boolean' name='[Calculation_9100…013]' … />
+        …
+        <groupfilter function='member' level='[none:Calculation_9100…013:nk]'
+                     member='true' />                  <!-- 맨값 -->
+        ```
+
+        감싸면 XSD는 통과하고 파일도 **열린다.** 대신 그 필터가 버려진다:
+
+        ```
+        'SEC04_01_손익 항목 리스트' 오류:
+        'C_레벨1' 필드의 필터를 구문 분석하는 동안 오류가 발생했습니다. 필터를 무시합니다.
+        ```
+
+        필터가 사라진 화면은 걸러져야 할 행을 그대로 보여준다 — **틀린 숫자가 조용히
+        배포된다.** 그래서 열린다고 넘기면 안 되고, 열리므로 ERROR도 아니다 (02 S1-6).
+
+        실측 (2026-09-14, 실파일 138개): 불리언 level + **맨값 5,923건 : 따옴표 0건**.
+        반대쪽도 같은 방향으로 갈린다 — 문자열 level + 따옴표 5,569건 : 맨값 0건.
+        문자열 쪽은 증상을 관측하지 못해 검사하지 않는다 (MA_004가 낸 것은 불리언
+        4건뿐이고, 그 4건이 오류 문구의 4개 필드와 1:1로 맞는다 — 05 F5-k).
+
+        **`level`의 컬럼을 못 찾으면 침묵하고 `note_partial`로 보고한다.** 동명 필드가
+        데이터소스마다 다른 `datatype`이면 판정하지 않는다 — 판정 불가와 위반을 섞으면
+        우리 지식의 공백이 남의 정상 파일을 막는다.
+        """
+        if ctx.raw_tree is None:
+            return []
+
+        datatypes = _datatypes_by_name(ctx.model)
+        out: list[Finding] = []
+        unresolved = 0
+        for el in ctx.raw_tree.iter("groupfilter"):
+            if el.get("function") != "member":
+                continue
+            level, value = el.get("level"), el.get("member")
+            if level is None or value is None or not _QUOTED_LITERAL.match(value):
+                continue
+            ref = fieldref.parse(level)
+            if ref is None or ref.special is not None:
+                continue
+            kinds = {k for name in ref.names for k in datatypes.get(name, ())}
+            if not kinds:
+                unresolved += 1
+                continue
+            if kinds != {BOOLEAN_DATATYPE}:
+                continue
+            bare = value[1:-1]
+            out.append(
+                Finding(
+                    severity=Severity.WARNING,
+                    rule_id=self.id,
+                    location=_path_of(el),
+                    line=el.sourceline,
+                    message=(
+                        f"불리언 필드 `{level}`의 필터 member `{value}`가 따옴표로 "
+                        "감싸였다 — Tableau가 필터를 구문 분석하지 못하고 **무시한다**. "
+                        "걸러져야 할 행이 화면에 남는다"
+                    ),
+                    fix=f"따옴표를 뗀다: `member='{bare}'`.",
+                )
+            )
+        if unresolved:
+            ctx.note_partial(
+                self.id,
+                f"`level`의 컬럼을 찾지 못해 member 표기를 판정하지 못한 필터 {unresolved}건",
+                scope="boolean-member",
+            )
+        return out
+
+
+def _datatypes_by_name(model: WorkbookModel) -> dict[str, set[str]]:
+    """필드 내부 이름 → 그 이름으로 선언된 `datatype`들.
+
+    집합인 것이 요점이다 — 데이터소스가 여럿이면 동명 필드의 `datatype`이 갈릴 수
+    있고, 그때는 판정하지 않는다 (03 D3.6의 네임스페이스 문제).
+    """
+    out: dict[str, set[str]] = {}
+    for ds in model.datasources.values():
+        for name, field_def in ds.fields.items():
+            if field_def.datatype is not None:
+                out.setdefault(name, set()).add(field_def.datatype)
+    return out
 
 
 def _fields_outside_parameters(model: WorkbookModel) -> set[str]:

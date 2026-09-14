@@ -293,3 +293,85 @@ def test_missing_tree_reports_the_skip(rule: RefNotationRule) -> None:
 
     assert rule.check(ctx) == []
     assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.SKIPPED]
+
+
+# ⑦-f — 불리언 필드의 member 리터럴 (2026-09-14 MA_004 손익계산서 실측, 05 F5-k)
+
+
+def _member_wb(datatype: str, member: str, *, second_ds: bool = False) -> str:
+    """`C_레벨1`을 `datatype`으로 선언하고 그 필드를 걸러내는 필터 하나를 단다."""
+    extra = (
+        (Ds(name="federated.zzz", typed_columns=(("C_레벨1", "string"),)),) if second_ds else ()
+    )
+    return make_twb(
+        datasources=(Ds(name="federated.abc", typed_columns=(("C_레벨1", datatype),)), *extra),
+        extra_body=(
+            "<filter class='categorical' column='[federated.abc].[none:C_레벨1:nk]'>"
+            f"<groupfilter function='member' level='[none:C_레벨1:nk]' member='{member}' />"
+            "</filter>"
+        ),
+    )
+
+
+def boolean_findings(rule: RefNotationRule, ctx: Any) -> list[Any]:
+    return [f for f in rule.check(ctx) if "불리언 필드" in f.message]
+
+
+def test_quoted_boolean_member_is_a_warning(rule: RefNotationRule, tmp_path: Path) -> None:
+    """실측: 불리언을 감싸면 *'필터를 구문 분석하는 동안 오류'*로 필터가 버려진다.
+
+    파일은 열린다 — 대신 걸러져야 할 행이 남아 **틀린 숫자**가 나온다. 그래서 WARNING.
+    """
+    ctx = ctx_with_model(tmp_path, _member_wb("boolean", "&quot;true&quot;"))
+
+    findings = boolean_findings(rule, ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert "member='true'" in (findings[0].fix or "")
+    assert findings[0].line is not None
+
+
+def test_bare_boolean_member_is_silent(rule: RefNotationRule, tmp_path: Path) -> None:
+    """정상본 5,923건이 전부 이 모양이다."""
+    ctx = ctx_with_model(tmp_path, _member_wb("boolean", "true"))
+
+    assert boolean_findings(rule, ctx) == []
+
+
+def test_quoted_string_member_is_silent(rule: RefNotationRule, tmp_path: Path) -> None:
+    """거짓양성 함정 — 겉모습은 같지만 문자열 필드는 감싸는 것이 **정상**이다.
+
+    정상본 5,569건이 이 모양이고 맨값은 0건이다. datatype을 안 보고 따옴표만 세면
+    여기가 통째로 걸린다 (AC7 붕괴).
+    """
+    ctx = ctx_with_model(tmp_path, _member_wb("string", "&quot;영업이익&quot;"))
+
+    assert boolean_findings(rule, ctx) == []
+
+
+def test_ambiguous_datatype_is_not_judged(rule: RefNotationRule, tmp_path: Path) -> None:
+    """동명 필드의 datatype이 데이터소스마다 다르면 판정하지 않는다 (S1-6).
+
+    `level`에는 데이터소스 한정자가 없어(⑦-d) 어느 쪽을 가리키는지 표기만으로는
+    정할 수 없다. 판정 불가를 위반으로 세면 우리 지식의 공백이 남의 파일을 막는다.
+    """
+    ctx = ctx_with_model(tmp_path, _member_wb("boolean", "&quot;true&quot;", second_ds=True))
+
+    assert boolean_findings(rule, ctx) == []
+
+
+def test_unresolvable_level_reports_the_partial(rule: RefNotationRule) -> None:
+    """컬럼을 못 찾았으면 조용히 넘기지 않고 **검사 못 했다고 말한다** (02 AC9)."""
+    ctx = make_ctx(
+        make_twb(
+            extra_body=(
+                "<filter class='categorical'>"
+                "<groupfilter function='member' level='[none:C_레벨1:nk]' "
+                "member='&quot;true&quot;' />"
+                "</filter>"
+            )
+        )
+    )
+
+    assert boolean_findings(rule, ctx) == []
+    assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.PARTIAL]

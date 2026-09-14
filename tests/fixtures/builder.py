@@ -49,7 +49,10 @@ class Ds:
 
     name: str
     columns: tuple[str, ...] = ()
-    """일반 컬럼의 내부 이름."""
+    """일반 컬럼의 내부 이름. `datatype`은 `string`이 된다."""
+
+    typed_columns: tuple[tuple[str, str], ...] = ()
+    """`(내부 이름, datatype)` — `datatype`이 판정에 쓰이는 규칙(⑦-f)용."""
 
     calcs: tuple[Calc, ...] = ()
     caption: str | None = None
@@ -171,8 +174,8 @@ def make_ctx(xml: str, *, model: WorkbookModel | None = None) -> ValidationConte
 def _datasource_xml(ds: Ds) -> str:
     caption = f" caption={quoteattr(ds.caption)}" if ds.caption else ""
     cols = "".join(
-        f"<column datatype='string' name={quoteattr(f'[{c}]')} role='dimension' />"
-        for c in ds.columns
+        f"<column datatype={quoteattr(dt)} name={quoteattr(f'[{c}]')} role='dimension' />"
+        for c, dt in [(c, "string") for c in ds.columns] + list(ds.typed_columns)
     )
     calcs = "".join(
         f"<column datatype='real' name={quoteattr(f'[{c.name}]')} role='measure'"
