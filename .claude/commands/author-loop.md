@@ -107,7 +107,7 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 
 ## 규칙 카탈로그 — 이 린터가 실제로 내는 `rule_id`
 
-**진단에 나오는 것은 아래 13개뿐이다.** 없는 rule id를 지어내지 않는다.
+**진단에 나오는 것은 아래 14개뿐이다.** 없는 rule id를 지어내지 않는다.
 
 | `rule_id` | 담당 층 | 심각도 | 무엇을 잡나 |
 |---|---|---|---|
@@ -117,6 +117,7 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 | `format.fcp_prefix` | 1 | ERROR/WARN | 신기능 서식을 fcp 접두 없이 맨 `<format>`으로 씀 |
 | `named.refs` | 1 | **ERROR** | zone ↔ worksheet ↔ viewpoint ↔ window 4자 불일치 |
 | `ref.notation` | 2·3 | WARNING | 표기 규약 — 필터 따옴표 · 자리표시자 · **매개변수 한정자** |
+| `calc.syntax` | 3·4 | WARNING | **수식 구조 문법** — 괄호·`{}` 짝 · `IF`/`CASE`↔`END` · `THEN`/`WHEN` 누락 |
 | `calc.functions` | 3 | WARNING | 화이트리스트에 없는 함수 (환각 함수) |
 | `calc.field_refs` | 3 | WARNING | dangling 필드 참조 |
 | `calc.aggregation` | 4 | WARNING | `derivation="User"`로 올린 계산에 집계가 없음 |

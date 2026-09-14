@@ -418,6 +418,27 @@ def _r29_quote_boolean_member(root: Any) -> str | None:
     return None
 
 
+def _r30_break_calc_syntax(root: Any) -> str | None:
+    """R30 — 수식 끝의 `)` 하나를 지운다 -> 계산필드가 오류 상태가 된다.
+
+    정상본은 문법 오류 표본을 **원리적으로** 줄 수 없다 (Tableau 편집기를 통과한
+    수식만 저장된다). 이 레시피가 규칙 ⑯의 유일한 검출 근거다 (05 F5-l).
+
+    괄호가 둘 이상 있는 수식만 고른다 — 하나뿐이면 지웠을 때 `SUM([a]` 처럼
+    함수 호출 자체가 사라져 다른 규칙이 먼저 울 수 있다.
+    """
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "calculation":
+            continue
+        formula = el.get("formula")
+        if not formula or formula.count("(") < 2 or not formula.rstrip().endswith(")"):
+            continue
+        stripped = formula.rstrip()
+        el.set("formula", stripped[:-1])
+        return f"calc 수식 끝의 ')' 제거: {stripped[-40:]!r}"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -551,6 +572,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + 경고: 필드의 필터를 구문 분석하는 동안 오류 — 필터를 무시합니다",
         source="docs/05-xsd-spike.md F5-k (2026-09-14 MA_004 손익계산서 실측)",
         mutate=_r29_quote_boolean_member,
+    ),
+    Recipe(
+        id="R30-break-calc-syntax",
+        rule="calc.syntax",
+        expected="열림 + 그 계산필드가 '계산에 오류 있음' → 종속 시트가 빈 화면",
+        source="docs/05-xsd-spike.md F5-l (2026-09-14 구조 문법 실측)",
+        mutate=_r30_break_calc_syntax,
     ),
 )
 

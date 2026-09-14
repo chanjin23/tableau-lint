@@ -39,6 +39,7 @@ _TOKEN = re.compile(
     r"|(?P<bracket>\[(?:[^\]]|\]\])*\](?:\.\[(?:[^\]]|\]\])*\])*)"
     r"|(?P<func>[A-Za-z_][A-Za-z0-9_]*)(?=\s*\()"
     r"|(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
+    r"|(?P<punct>[(){}])"
 )
 
 KEYWORDS = frozenset(
@@ -113,3 +114,83 @@ def extract(formula: str) -> CalcRefs:
             if name not in KEYWORDS:
                 refs.functions.add(name)
     return refs
+
+
+@dataclass(frozen=True, slots=True)
+class CalcStructure:
+    """한 수식의 **구조 집계** — 규칙 ⑯(`calc.syntax`)이 소비한다.
+
+    D3.7이 예고한 "스캐너 **위에** 얹는다"의 첫 사례다. 구문 트리를 세우지 않는다 —
+    짝이 맞는지를 세기만 하므로 스캐너처럼 **실패할 수 없고**, 지원 못 한 구문마다
+    파싱 실패가 나는 문법 파서의 노이즈 클래스가 여기에도 없다.
+
+    주석·문자열·필드 참조는 토큰 우선순위에서 먼저 먹히므로 그 **안의** `END`나 `(`는
+    세지 않는다 (실측: 정상본 85,316개 수식 위반 0건, 거짓양성 함정 4/4 침묵).
+    """
+
+    paren_depth: int
+    """끝까지 닫히지 않은 `(`의 수. 0이 정상."""
+
+    paren_underflow: bool
+    """여는 것보다 닫는 `)`가 먼저 나온 적이 있는가."""
+
+    brace_depth: int
+    """LOD `{}`의 잔여 깊이. 0이 정상."""
+
+    ifs: int
+    cases: int
+    ends: int
+    thens: int
+    whens: int
+    """언어 키워드 출현 횟수 (대소문자 무시)."""
+
+    @property
+    def opens(self) -> int:
+        """`END`를 요구하는 블록의 수. `IF`와 `CASE` 둘 다다."""
+        return self.ifs + self.cases
+
+
+def structure(formula: str) -> CalcStructure:
+    """수식의 괄호·블록 짝을 센다. 예외를 던지지 않는다 (`extract`와 같은 계약).
+
+    >>> structure("IF [A] > 0 THEN 1 ELSE 0 END").opens
+    1
+    >>> structure("SUM([매출]) / SUM([수량]").paren_depth
+    1
+    >>> structure("IF [A] THEN 'END' ELSE 0 END").ends      # 문자열 안은 안 센다
+    1
+    """
+    depth = brace = 0
+    underflow = False
+    counts: dict[str, int] = {}
+    for m in _TOKEN.finditer(formula):
+        kind = m.lastgroup
+        if kind in ("comment", "string", "bracket"):
+            continue
+        if kind == "punct":
+            token = m.group()
+            if token == "(":
+                depth += 1
+            elif token == ")":
+                depth -= 1
+                if depth < 0:
+                    # 0으로 되돌린다 — 뒤에 진짜로 안 닫힌 괄호가 또 있으면
+                    # 그것도 보여야 한다. 음수를 끌고 가면 서로 상쇄된다.
+                    underflow, depth = True, 0
+            elif token == "{":
+                brace += 1
+            else:
+                brace -= 1
+        elif kind in ("func", "name"):
+            word = m.group().upper()
+            counts[word] = counts.get(word, 0) + 1
+    return CalcStructure(
+        paren_depth=depth,
+        paren_underflow=underflow,
+        brace_depth=brace,
+        ifs=counts.get("IF", 0),
+        cases=counts.get("CASE", 0),
+        ends=counts.get("END", 0),
+        thens=counts.get("THEN", 0),
+        whens=counts.get("WHEN", 0),
+    )
