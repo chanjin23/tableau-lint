@@ -39,7 +39,7 @@ _TOKEN = re.compile(
     r"|(?P<bracket>\[(?:[^\]]|\]\])*\](?:\.\[(?:[^\]]|\]\])*\])*)"
     r"|(?P<func>[A-Za-z_][A-Za-z0-9_]*)(?=\s*\()"
     r"|(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
-    r"|(?P<punct>[(){}])"
+    r"|(?P<punct>[(),{}])"
 )
 
 KEYWORDS = frozenset(
@@ -179,8 +179,9 @@ def structure(formula: str) -> CalcStructure:
                     underflow, depth = True, 0
             elif token == "{":
                 brace += 1
-            else:
+            elif token == "}":
                 brace -= 1
+            # `,`는 짝을 세는 대상이 아니다 — 여기서 걸러내지 않으면 `}`로 읽힌다
         elif kind in ("func", "name"):
             word = m.group().upper()
             counts[word] = counts.get(word, 0) + 1
@@ -194,3 +195,97 @@ def structure(formula: str) -> CalcStructure:
         thens=counts.get("THEN", 0),
         whens=counts.get("WHEN", 0),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class AggregationSplit:
+    """수식을 **집계 문맥 기준**으로 가른 결과 — 규칙 ⑧-c가 소비한다.
+
+    Tableau는 한 수식 안에서 집계와 행수준을 섞는 것을 거부한다:
+
+        SUM([매출]) + [수량]                      집계 + 행수준 -> 거부
+        IF SUM([A]) > 0 THEN [B] ELSE 0 END      조건은 집계, 분기는 행수준 -> 거부
+
+    가리는 것은 두 가지다. **집계 함수의 인자 안**은 행수준이 정상이고
+    (`SUM([A] + [B])`), **LOD 중괄호 안**도 마찬가지다 — LOD 결과는 행수준 값처럼
+    쓰이므로 그 안의 집계는 바깥 문맥을 물들이지 않는다 (규칙 ⑧-a와 같은 판단).
+    """
+
+    aggregates: tuple[str, ...]
+    """가려지지 않은 자리에서 호출된 집계 함수들."""
+
+    bare_refs: tuple[str, ...]
+    """가려지지 않은 자리에 **맨몸으로** 나온 필드 참조 (원문 표기)."""
+
+
+def aggregation_split(
+    formula: str,
+    aggregates: frozenset[str],
+    arity_sensitive: frozenset[str] = frozenset(),
+) -> AggregationSplit:
+    """수식에서 최상위 집계 호출과 맨 필드 참조를 가른다.
+
+    `aggregates`·`arity_sensitive`를 **인자로 받는다** — 어느 함수가 집계인가는
+    calc 언어의 어휘가 아니라 규칙의 정책이고, 스캐너는 정책을 갖지 않는다.
+
+    `arity_sensitive`는 **인자 수로 성격이 갈리는** 함수다. `MIN`/`MAX`가 그렇다 —
+    `MIN([A])`는 집계지만 `MIN([A], [B])`는 행수준 함수다 (실측: 1개 4,849 · 2개 49).
+    인자 수는 닫는 괄호에서야 알 수 있으므로 판정을 그때까지 미룬다.
+
+    >>> agg = frozenset({"SUM"})
+    >>> aggregation_split("SUM([A]) + [B]", agg).bare_refs
+    ('[B]',)
+    >>> aggregation_split("SUM([A] + [B])", agg).bare_refs
+    ()
+    """
+    tokens = [
+        (m.lastgroup, m.group())
+        for m in _TOKEN.finditer(formula)
+        if m.lastgroup not in ("comment", "string")
+    ]
+    top_aggs: list[str] = []
+    top_refs: list[str] = []
+    shielded = 0
+    # 프레임: [함수명|None, 최상위 콤마 수, 이 프레임이 가리는가, 모아 둔 참조]
+    stack: list[list[Any]] = []
+
+    i = 0
+    while i < len(tokens):
+        kind, text = tokens[i]
+        if kind == "func" and text.upper() not in KEYWORDS:
+            name = text.upper()
+            deferred = name in arity_sensitive
+            shields = name in aggregates and not deferred
+            if shields and shielded == 0:
+                top_aggs.append(name)
+            stack.append([name, 0, shields, []])
+            if shields:
+                shielded += 1
+            i += 2  # 바로 뒤 '('를 프레임으로 다시 세지 않는다
+            continue
+
+        if kind == "punct" and text == "(":
+            stack.append([None, 0, False, []])
+        elif kind == "punct" and text == "{":
+            stack.append([None, 0, True, []])
+            shielded += 1
+        elif kind == "punct" and text in ")}":
+            if stack:
+                name, commas, shields, buffered = stack.pop()
+                if shields:
+                    shielded -= 1
+                elif name in arity_sensitive and commas == 0 and name in aggregates:
+                    # 인자 1개였다 = 집계다. 그 안의 참조는 가려진 것으로 되돌린다.
+                    if shielded == 0:
+                        top_aggs.append(name)
+                    buffered = []
+                if buffered:
+                    (stack[-1][3] if stack else top_refs).extend(buffered)
+        elif kind == "punct" and text == ",":
+            if stack:
+                stack[-1][1] += 1
+        elif kind == "bracket" and shielded == 0:
+            (stack[-1][3] if stack else top_refs).append(text)
+        i += 1
+
+    return AggregationSplit(aggregates=tuple(top_aggs), bare_refs=tuple(top_refs))

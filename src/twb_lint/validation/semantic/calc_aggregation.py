@@ -52,6 +52,35 @@ MA_011 실측). 저작 시점에는 행 수준이라 `[sum:…]`이 맞았고, �
 남는 반례는 2건, `태블로판차분석` 한 계보뿐이다(`SUM({ FIXED … })`에 `sum:`).
 그 파일은 규칙 ⑪에서도 dangling 28건이 나온 파일이라 진짜 결함일 가능성이 높지만,
 확인 전까지는 **WARNING**이다 (02 S1-6).
+
+## ⑧-c — 한 수식 안에서 집계와 행수준을 섞었다 (2026-09-14)
+
+⑧-a·⑧-b와 **입력이 다르다.** 둘은 수식과 `derivation` 선언을 교차 검사하지만,
+⑧-c는 **수식 안만** 본다. 묻는 것은 같다 — 집계 수준이 맞는가.
+
+```
+SUM([매출]) + [수량]                        집계 + 행수준
+IF SUM([A]) > 0 THEN [B] ELSE 0 END        조건은 집계, 분기는 행수준
+```
+
+    오류: 집계 및 비집계 인수를 이 함수와 함께 혼합할 수 없습니다.
+
+**가려지는 자리가 둘이다.** 집계 함수의 인자 안은 행수준이 정상이고(`SUM([A] + [B])`),
+LOD 중괄호 안도 마찬가지다(`{FIXED [a] : SUM([b])} + [c]`는 정상) — ⑧-a가 LOD를
+집계로 치지 않는 것과 같은 판단이다.
+
+**`MIN`·`MAX`는 인자 수로 갈린다.** `MIN([A])`는 집계지만 `MIN([A], [B])`는 행수준
+함수다 (실측 1개 4,849 : 2개 49). 이걸 안 가르면 정상본이 걸린다 — 실제로 첫
+시제품이 MA_006의 `F_PERIOD` 계열 21건을 오탐했고, 원인이 그것이었다.
+
+실측 (2026-09-14, 실파일 138개 · 수식 85,316건): **혼합 0건.**
+`TODO.md`가 *"시제품 실측이 실파일에서 혼합 0건 → 잡을 게 없는 규칙"*으로 적어 둔
+그 수치인데, **읽기가 틀렸다**: 0건은 규칙이 무용하다는 뜻이 아니라 **AC7 근거**다.
+정상 워크북은 Tableau 편집기를 통과했으므로 혼합이 있을 수 없다. 검출 근거는
+규칙 ⑯과 같은 자리에서 온다 — 주입 레시피 R31과 우리 저작본이다 (01 v2.0).
+
+⚠️ **모르면 침묵한다**는 ⑧-a와 같다. 맨 참조를 끝까지 펼치지 못하면 위반이 아니라
+`note_partial`이다. 매개변수는 상수라 어느 쪽에도 걸지 않는다.
 """
 
 from __future__ import annotations
@@ -59,7 +88,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from twb_lint.calc.extractor import extract
+from twb_lint import fieldref
+from twb_lint.calc.extractor import (
+    aggregation_split,
+    extract,
+    formulas_in,
+)
 from twb_lint.models import Finding, Severity
 from twb_lint.validation.context import ValidationContext
 from twb_lint.validation.registry import register
@@ -96,6 +130,12 @@ AGGREGATE_DERIVATIONS = frozenset(
 ⑧-b가 쓴다. 실파일 47개에 실제로 나온 것은 `Sum`·`Attribute` 계열이지만, 목록을
 좁히면 `Avg`로 쓴 같은 결함을 놓친다 — 여기 있는 것은 전부 집계 함수 이름이다."""
 
+ARITY_SENSITIVE_AGGREGATES = frozenset({"MIN", "MAX"})
+"""인자 1개면 집계, 2개면 **행수준 함수**다 (실측 `MIN` 1개:4,849 · 2개:49).
+
+⑧-c만 쓴다. ⑧-a·⑧-b의 `_chain_has_aggregate`는 이 구분 없이 돌아왔고, 그 결과를
+지금 바꾸면 두 검사의 실측 근거가 함께 흔들린다 — 필요해지면 따로 잰다."""
+
 _LOD_BLOCK = re.compile(r"\{[^{}]*\}")
 """LOD 표현식. 안쪽 집계는 집계로 치지 않는다 — 위 독스트링 참조."""
 
@@ -123,6 +163,7 @@ class CalcAggregationRule(RuleBase):
         undecided: list[str] = []
         out = self._missing_aggregate(ctx, formulas, known, undecided)
         out += self._double_aggregate(ctx, formulas, known, undecided)
+        out += self._mixed_levels(ctx, formulas, known, undecided)
 
         if undecided:
             # 판정 못 한 것을 조용히 넘기면 "전부 검사했다"로 읽힌다 (02 S5).
@@ -204,6 +245,50 @@ class CalcAggregationRule(RuleBase):
                         "`derivation='User'` · `name='[usr:…:qk]'`로 바꾸고, 그 인스턴스를 "
                         "가리키는 선반·필터·`slices`·`style-rule/format@field`·"
                         "`encodings` 참조도 함께 교체한다."
+                    ),
+                )
+            )
+        return out
+
+
+    def _mixed_levels(
+        self,
+        ctx: ValidationContext,
+        formulas: dict[str, str],
+        known: set[str],
+        undecided: list[str],
+    ) -> list[Finding]:
+        """⑧-c — 한 수식 안에서 집계와 행수준을 섞었다."""
+        params = _parameter_names(ctx)
+        out: list[Finding] = []
+        for el, formula in formulas_in(ctx.raw_tree):
+            split = aggregation_split(
+                formula, AGGREGATE_FUNCTIONS, ARITY_SENSITIVE_AGGREGATES
+            )
+            if not split.aggregates:
+                continue
+            row_level = _confident_row_level(
+                split.bare_refs, formulas, known, params, undecided
+            )
+            if not row_level:
+                continue
+            shown = ", ".join(f"`{r}`" for r in row_level[:3])
+            out.append(
+                Finding(
+                    severity=Severity.WARNING,
+                    rule_id=self.id,
+                    location=_path_of(el),
+                    line=el.sourceline,
+                    message=(
+                        f"수식이 집계(`{split.aggregates[0]}`)와 행수준 참조 {shown}를 "
+                        "같은 자리에서 섞었다 — Tableau가 *'집계 및 비집계 인수를 이 "
+                        "함수와 함께 혼합할 수 없습니다'*로 거부하고, 그 필드를 쓰는 "
+                        "시트가 **빈 화면**이 된다"
+                    ),
+                    fix=(
+                        f"행수준 참조를 집계로 감싸거나(`SUM({row_level[0]})`·"
+                        f"`ATTR({row_level[0]})`), 반대로 집계를 벗겨 양쪽을 행수준으로 "
+                        "맞춘다. 뷰 그레인과 무관한 값이면 LOD(`{FIXED … }`)로 고정한다."
                     ),
                 )
             )
@@ -306,6 +391,47 @@ def _chain_has_aggregate(
             unresolved = True
         # `known`에 있는 비계산 필드(원본 컬럼·매개변수)는 집계가 아니다 → 그냥 넘어간다
     return None if unresolved else False
+
+
+
+def _parameter_names(ctx: ValidationContext) -> set[str]:
+    """매개변수 이름. 상수이므로 집계에도 행수준에도 걸지 않는다."""
+    ds = ctx.model.datasources.get("Parameters")
+    return set(ds.fields) if ds is not None else set()
+
+
+def _confident_row_level(
+    refs: tuple[str, ...],
+    formulas: dict[str, str],
+    known: set[str],
+    params: set[str],
+    undecided: list[str],
+) -> list[str]:
+    """맨 참조 중 **행수준임이 확실한** 것만 고른다.
+
+    판정 불가를 위반으로 읽지 않는 것이 이 검사의 안전장치다 (⑧-a와 같다).
+    확실한 세 가지만 통과시킨다 — 정의를 아는 비집계 계산 · 원본 컬럼 · 그 둘뿐이다.
+    """
+    out: list[str] = []
+    for raw in refs:
+        ref = fieldref.parse(raw)
+        if ref is None or ref.special is not None:
+            continue  # `[:Measure Names]` 같은 내장 축 — 필드가 아니다
+        name = _last_name(raw)
+        if name in params:
+            continue  # 매개변수는 상수다
+        if name in formulas:
+            verdict = _chain_has_aggregate(name, formulas, known)
+            if verdict is None:
+                undecided.append(name)
+            elif not verdict:
+                out.append(raw)
+            continue
+        if name in known:
+            out.append(raw)  # 원본 컬럼 — 집계가 아님이 확실하다
+        else:
+            undecided.append(name)
+    return out
 
 
 def _strip_lod(formula: str) -> str:

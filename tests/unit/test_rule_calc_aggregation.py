@@ -226,3 +226,84 @@ def test_missing_tree_reports_the_skip(rule: CalcAggregationRule) -> None:
 
     assert rule.check(ctx) == []
     assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.SKIPPED]
+
+
+# ⑧-c — 한 수식 안에서 집계와 행수준을 섞었다 (2026-09-14 실측, 05 F5-m)
+
+
+def _mix_wb(formula: str, *, with_param: bool = False) -> str:
+    """`C_혼합` 하나만 든 워크북. `매출`·`수량`은 원본 컬럼(= 행수준 확정)이다."""
+    sources = [Ds(name="federated.abc", columns=("매출", "수량"), calcs=(
+        Calc(name="C_혼합", formula=formula),
+        Calc(name="C_집계", formula="SUM([매출])"),
+    ))]
+    if with_param:
+        sources.append(Ds(name="Parameters", columns=("P_기준",)))
+    return make_twb(datasources=tuple(sources))
+
+
+def mixed_findings(rule: CalcAggregationRule, ctx: Any) -> list[Any]:
+    return [f for f in rule.check(ctx) if "섞었다" in f.message]
+
+
+@pytest.mark.parametrize(
+    ("formula", "why"),
+    [
+        ("SUM([매출]) + [수량]", "덧셈에서 섞였다"),
+        ("IF SUM([매출]) > 0 THEN [수량] ELSE 0 END", "조건은 집계, 분기는 행수준"),
+        ("IF [수량] > 0 THEN SUM([매출]) ELSE 0 END", "조건은 행수준, 분기는 집계"),
+        ("[수량] / SUM([매출])", "나눗셈에서 섞였다"),
+        ("SUM([매출]) + [C_집계] + [수량]", "집계 계산필드는 무죄, 원본 컬럼이 범인"),
+    ],
+)
+def test_mixed_levels_are_a_warning(
+    rule: CalcAggregationRule, tmp_path: Path, formula: str, why: str
+) -> None:
+    """Tableau는 *'집계 및 비집계 인수를 혼합할 수 없습니다'*로 거부한다.
+
+    파일은 열리므로 WARNING이다 — 대신 그 필드를 쓰는 시트가 빈 화면이 된다.
+    """
+    findings = mixed_findings(rule, ctx_for(tmp_path, _mix_wb(formula)))
+
+    assert [f.severity for f in findings] == [Severity.WARNING], why
+    assert "[수량]" in findings[0].message
+    assert findings[0].fix
+
+
+@pytest.mark.parametrize(
+    ("formula", "why"),
+    [
+        ("SUM([매출] + [수량])", "둘 다 집계 인자 안 — 정상"),
+        ("SUM([매출]) + SUM([수량])", "바깥에 맨 참조가 없다"),
+        ("[매출] + [수량]", "집계가 아예 없다"),
+        ("SUM([매출]) + [C_집계]", "맨 참조가 집계 계산필드다"),
+        ("MIN([매출], [수량])", "2인자 MIN은 행수준 함수 — 집계가 아니다"),
+        ("{FIXED [수량] : SUM([매출])} + [수량]", "LOD는 행수준에서 쓸 수 있다"),
+        ("SUM(IF [수량] > 0 THEN [매출] END)", "IF가 통째로 집계 인자 안에 있다"),
+    ],
+)
+def test_unmixed_formulas_are_silent(
+    rule: CalcAggregationRule, tmp_path: Path, formula: str, why: str
+) -> None:
+    """거짓양성 함정 — 정상본 85,316개 수식이 전부 이쪽이다 (AC7)."""
+    assert mixed_findings(rule, ctx_for(tmp_path, _mix_wb(formula))) == [], why
+
+
+def test_parameters_are_not_row_level(rule: CalcAggregationRule, tmp_path: Path) -> None:
+    """매개변수는 상수다 — 집계에도 행수준에도 걸지 않는다."""
+    ctx = ctx_for(tmp_path, _mix_wb("SUM([매출]) > [Parameters].[P_기준]", with_param=True))
+
+    assert mixed_findings(rule, ctx) == []
+
+
+def test_unresolvable_reference_is_not_a_violation(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """워크북 어디에도 정의가 없는 참조는 **판정 불가**다 (⑧-a와 같은 안전장치).
+
+    비집계로 단정하면 우리가 못 펼친 것이 남의 정상 파일을 막는다 (02 S1-6).
+    """
+    ctx = ctx_for(tmp_path, _mix_wb("SUM([매출]) + [어디에도_없는_필드]"))
+
+    assert mixed_findings(rule, ctx) == []
+    assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.PARTIAL]

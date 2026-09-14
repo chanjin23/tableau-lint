@@ -120,7 +120,7 @@ twb_validate(.twb) 채점 → 반복 → twbx.pack() → twb_validate(.twbx) 최
 | `calc.syntax` | 3·4 | WARNING | **수식 구조 문법** — 괄호·`{}` 짝 · `IF`/`CASE`↔`END` · `THEN`/`WHEN` 누락 |
 | `calc.functions` | 3 | WARNING | 화이트리스트에 없는 함수 (환각 함수) |
 | `calc.field_refs` | 3 | WARNING | dangling 필드 참조 |
-| `calc.aggregation` | 4 | WARNING | `derivation="User"`로 올린 계산에 집계가 없음 |
+| `calc.aggregation` | 4 | WARNING | 집계 수준 정합 — `derivation="User"`인데 집계 없음 · 이중 집계 · **한 수식에서 집계↔행수준 혼합** |
 | `set.definition` | 4 | WARNING | 집합에 기반 필드가 없음 |
 | `action.refs` | 2·4 | WARNING | 동작 배선 **참조** — 소스 시트·대상 매개변수·집합·필드 |
 | `action.shape` | 2 | WARNING | 동작 배선 **어휘** — 명령·param 이름·`<link>` 짝 |

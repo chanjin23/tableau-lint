@@ -439,6 +439,63 @@ def _r30_break_calc_syntax(root: Any) -> str | None:
     return None
 
 
+def _is_plain_field_name(name: str) -> bool:
+    """`[매출액]` 같은 **한정되지 않은 보통 이름**인가.
+
+    제외 대상이 둘 있고 둘 다 실측으로 걸렸다: `[:Measure Names]`(내장 축)와
+    `[__tableau_internal_object_id__].[…]`(내부 객체 네임스페이스). 어느 쪽도 필드
+    유니버스에 없어서 주입하면 혼합이 아니라 **dangling**이 만들어진다.
+    """
+    return (
+        name.startswith("[")
+        and name.endswith("]")
+        and "].[" not in name
+        and not name.startswith("[:")
+        and ":" not in name
+    )
+
+
+def _r31_mix_aggregation_levels(root: Any) -> str | None:
+    """R31 — 집계 수식에 행수준 참조를 하나 더한다 -> 집계/비집계 혼합.
+
+    정상본은 이 결함의 표본을 줄 수 없다 (Tableau 편집기가 막는다) — R30과 같은
+    이유로 이 레시피가 규칙 ⑧-c의 유일한 검출 근거다 (05 F5-m).
+
+    행수준 참조는 **그 데이터소스의 원본 컬럼**에서 고른다. 계산필드를 쓰면 그것이
+    집계일 수 있어 혼합이 안 만들어진다.
+    """
+    for ds in root.iter():
+        if not isinstance(ds.tag, str) or fcp.strip_prefix(ds.tag) != "datasource":
+            continue
+        if ds.get("name") == "Parameters":
+            continue
+        plain = [
+            col.get("name")
+            for col in ds.iter()
+            if isinstance(col.tag, str)
+            and fcp.strip_prefix(col.tag) == "column"
+            and col.get("name")
+            and _is_plain_field_name(col.get("name", ""))
+            and col.get("datatype")                        # 실제 데이터 컬럼만
+            and col.find("calculation") is None
+        ]
+        if not plain:
+            continue
+        victim = plain[0]
+        for col in ds.iter():
+            if not isinstance(col.tag, str) or fcp.strip_prefix(col.tag) != "column":
+                continue
+            calc = col.find("calculation")
+            if calc is None:
+                continue
+            formula = calc.get("formula")
+            if not formula or "SUM(" not in formula.upper():
+                continue
+            calc.set("formula", f"({formula}) + {victim}")
+            return f"계산 '{col.get('name')}' 수식에 행수준 참조 {victim} 추가"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -579,6 +636,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + 그 계산필드가 '계산에 오류 있음' → 종속 시트가 빈 화면",
         source="docs/05-xsd-spike.md F5-l (2026-09-14 구조 문법 실측)",
         mutate=_r30_break_calc_syntax,
+    ),
+    Recipe(
+        id="R31-mix-aggregation-levels",
+        rule="calc.aggregation",
+        expected="열림 + '집계 및 비집계 인수를 이 함수와 함께 혼합할 수 없습니다' → 시트 빈 화면",
+        source="docs/05-xsd-spike.md F5-m (2026-09-14 집계/행수준 실측)",
+        mutate=_r31_mix_aggregation_levels,
     ),
 )
 
