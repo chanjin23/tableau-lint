@@ -496,6 +496,23 @@ def _r31_mix_aggregation_levels(root: Any) -> str | None:
     return None
 
 
+def _r32_drop_paramctrl_mode(root: Any) -> str | None:
+    """R32 — paramctrl 존에서 `mode`를 지운다 -> 내부 오류 CB5AF9D4로 안 열린다.
+
+    XSD는 `mode`를 선택 속성으로 선언하므로 L-A가 통과시킨다 — "XSD 통과 ≠ 열린다"의
+    또 하나의 실증이다 (05 F5-n).
+    """
+    for zone in root.iter():
+        if not isinstance(zone.tag, str) or fcp.strip_prefix(zone.tag) != "zone":
+            continue
+        if zone.get("type-v2") != "paramctrl" or zone.get("mode") is None:
+            continue
+        before = zone.get("mode")
+        del zone.attrib["mode"]
+        return f"paramctrl 존(param={zone.get('param')})의 mode='{before}' 제거"
+    return None
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -643,6 +660,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 + '집계 및 비집계 인수를 이 함수와 함께 혼합할 수 없습니다' → 시트 빈 화면",
         source="docs/05-xsd-spike.md F5-m (2026-09-14 집계/행수준 실측)",
         mutate=_r31_mix_aggregation_levels,
+    ),
+    Recipe(
+        id="R32-drop-paramctrl-mode",
+        rule="zone.shape",
+        expected="내부 오류 CB5AF9D4 — 파일이 열리지 않는다",
+        source="docs/05-xsd-spike.md F5-n (2026-09-14 MA_004 실측)",
+        mutate=_r32_drop_paramctrl_mode,
     ),
 )
 
