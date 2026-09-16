@@ -128,7 +128,7 @@
 - **비고**: *"PowerShell `[xml]` 파싱·자체 검증은 전부 통과했는데도"* 거부됐다 —
   well-formed ≠ 스키마 유효의 교과서적 사례. **L-A의 존재 이유**
 
-### R8. `<datagraph>` (동적 존 표시) 삽입 [보류]
+### R8. `<datagraph>` (동적 존 표시) 삽입 [**해소됨 — R33 참조** (2026-09-16)]
 
 - **증상**: `std::out_of_range: invalid unordered_map<K,T> key` → 로드 거부
 - **원천**: 함정 I1 — 6가지 변형 전부 실패, **미해결**
@@ -804,3 +804,28 @@ XSD는 통과하지만(값이 `StyleAttribute-ST`에 열거돼 있다) 로더가
 ③ 존재 축으로 안 잡히면 **속성 키 조합**을 센다. 이번 원인이 거기 있었다.
 
 **주입 레시피**: R32 — 정상본 `paramctrl` 존 하나에서 `mode`를 지운다.
+
+## R33 — `<datagraph>` 매니페스트 게이트 → ✅ **규칙 ⑥ 게이트 3쌍** (2026-09-16)
+
+**R8의 후속이다.** R8은 *"`<datagraph>`(동적 존 표시) 삽입 [보류]"*로 표본 없이
+적혀 있었다. 2026-09-16에 표본이 생겼다.
+
+**증상**: 로드 거부 D2E8DA72 · `no declaration found for element 'datagraph'`
+(MA_004 JWLH 260916). 린터는 `findings=0`이었다 — AC3 위반.
+
+**성질**: `<datagraph>`는 **동적 존 표시(Dynamic Zone Visibility)**의 저장 형식이다.
+사용자가 표시 유형 제어를 요구하면 Tableau가 이 그래프로 직렬화한다 —
+`single-value-field-node`(필드 값) → `dashboard-zone-visibility-node`(존 가시성).
+
+**근거** (실파일 243개, 05 F5-o): datagraph 보유 15개가 4항목을 **모두** 선언하고
+미보유 228개는 **하나도** 선언하지 않는다. 양방향 반례 0.
+
+**뭉뚱그리지 않았다**: 네 항목이 완전히 동시출현하지만 `simple-id`에서 과요구가
+드러난 전례가 있어 **이름이 대응하는 요소에만** 걸었다 (`DatagraphNode<X>V1` ↔
+`<x-node>`). 실측으로 지목된 것은 `datagraph` 하나뿐이고 나머지 둘은 이름 대응 +
+15:0 상관이다.
+
+**`ZoneVisibilityControl`은 제외**: 대응이 요소가 아니라 속성(`zone@hidden-by-user`)
+이라 요소 단위 표에 담을 자리가 없다. `known_items_unmapped`로 남긴다.
+
+**주입 레시피**: R33 — `<datagraph>`를 쓰는 정상본에서 `DatagraphCoreV1`만 지운다.

@@ -3,7 +3,6 @@
   "note": "기능 ↔ <document-format-change-manifest> 항목 대응 (L-B 규칙 ⑥). 유효 문법 = version 선언 × 매니페스트 항목 집합이라, 기능을 쓰면서 대응 항목을 선언하지 않으면 로드 거부된다. 공식 XSD는 이 요소들을 무조건 허용하므로 L-A가 원리적으로 못 잡는다.",
   "policy": "표에 있는 기능만 ERROR로 판정한다. 표에 없는 요소를 추측해 ERROR를 내지 않는다 (docs/02-specification.md S1-6).",
   "provenance": "docs/05-xsd-spike.md F5·F7 · docs/06-rule-candidates.md R1 · 2026-07-30 실파일 61개 상관 분석 · 2026-08-10 실파일 113개 상관 분석(simple-id)",
-
   "fcp_rule": {
     "note": "규칙 ⑥-a. fcp 계열은 대응표가 필요 없다 — 기능명이 이름 안에 박혀 있어 구조에서 도출된다. 트리에 `_.fcp.<F>.<true|false>...<이름>`이 있으면 매니페스트에 `_.fcp.<F>.true...<F>`가 있어야 한다. 표본 10/10 일치 (05 F7).",
     "input": "정규화 **전** 원본 트리. fcp 정규화가 요소의 소속 기능을 지운다 (05 F7 함의 2).",
@@ -14,54 +13,93 @@
       "VConnDownstreamExtractsWithWarnings"
     ]
   },
-
   "gates": [
     {
       "element": "manual-sort",
-      "requires": ["SortTagCleanup"],
+      "requires": [
+        "SortTagCleanup"
+      ],
       "symptom": "no declaration found for element 'manual-sort'",
       "source": "docs/05-xsd-spike.md F5 (함정 W2)"
     },
     {
       "element": "computed-sort",
-      "requires": ["SortTagCleanup"],
+      "requires": [
+        "SortTagCleanup"
+      ],
       "symptom": "no declaration found for element 'computed-sort'",
       "source": "2026-07-30 실측 (MA_003 매출표 로드 거부 D2E8DA72). manual-sort와 같은 항목이 게이팅한다 — 거부 메시지의 content model이 F5의 manual-sort 사례와 동일하다. 실파일 61개: computed-sort 23개 중 SortTagCleanup 없는 것은 거부된 그 파일 1개뿐, 역방향 반례 0"
     },
     {
       "element": "edit-group-action",
-      "requires": ["GroupAction", "GroupActionAddRemove"],
+      "requires": [
+        "GroupAction",
+        "GroupActionAddRemove"
+      ],
       "symptom": "no declaration found for element 'edit-group-action'",
       "source": "docs/06-rule-candidates.md R1 (함정 I7)"
     },
     {
       "element": "edit-parameter-action",
-      "requires": ["ParameterAction"],
+      "requires": [
+        "ParameterAction"
+      ],
       "symptom": "no declaration found for element 'edit-parameter-action'",
       "source": "2026-07-30 실측 (MA_003 매출표 로드 거부 D2E8DA72). 실파일 61개에서 쌍조건: edit-parameter-action 28개 중 ParameterAction 없는 것은 거부된 그 파일 1개뿐, ParameterAction만 있고 요소가 없는 파일 0"
     },
     {
       "element": "clear-option",
-      "requires": ["ParameterActionClearSelection"],
+      "requires": [
+        "ParameterActionClearSelection"
+      ],
       "symptom": "no declaration found for element 'clear-option'",
       "source": "2026-07-30 실파일 61개 상관. clear-option 출현 72회 전부 부모가 edit-parameter-action이고, 항목 ParameterActionClearSelection과 쌍조건(반례 0). 거부 메시지는 부모인 edit-parameter-action 쪽만 실측됐다 — 이 항목 단독 인과는 미실측이라 요소를 clear-option으로 좁혀 잡는다(매개변수 액션에 clear-option이 없으면 요구하지 않는다)"
     },
     {
       "element": "object-graph",
-      "requires": ["ObjectModelTableType", "ObjectModelEncapsulateLegacy", "SchemaViewerObjectModel"],
+      "requires": [
+        "ObjectModelTableType",
+        "ObjectModelEncapsulateLegacy",
+        "SchemaViewerObjectModel"
+      ],
       "symptom": "no declaration found for element 'object-graph' / element 'object-graph' is not allowed for content model '(repository-location?,connection?,utility-dimensions?,dimension*,…)'",
       "source": "2026-08-10 분리 실험 V3. CSV 데이터 원본 정본(관찰_B)에서 이 3항목만 지우자 로드 거부(D2E8DA72). 거부 메시지가 object-graph를 직접 지목했고, 같은 메시지에 relation@type='table'의 `value 'table' not in enumeration`과 columns의 `missing required attribute 'dim-percentage'/'measure-percentage'`도 함께 나왔다 — 세 항목이 데이터 원본의 객체 모델 문법을 통째로 연다. 실파일 113개 상관: relation을 가진 데이터 원본 전부가 3항목을 선언(반례 0). ⚠️ **3항목을 한꺼번에 지워서 어느 것이 object-graph를 게이팅하는지는 미분리** — edit-group-action 선례대로 전부 요구한다. simple-id에서 과요구가 드러난 전례가 있으므로 분리 실험이 필요하다 (TODO L5)"
     },
     {
       "element": "simple-id",
-      "requires": ["SheetIdentifierTracking"],
+      "requires": [
+        "SheetIdentifierTracking"
+      ],
       "symptom": "no declaration found for element 'simple-id' / attribute 'uuid' is not declared for element 'simple-id' / element 'simple-id' is not allowed for content model '(((layout-options?)|(repository-location?)),table)'",
       "source": "2026-08-10 실측 2회. ① 매니페스트 블록이 통째로 없는 저작본(worksheet/simple-id 2개)이 Tableau 2026.1에서 로드 거부(D2E8DA72), 거부 메시지가 요소를 직접 지목했다. ② 실파일 113개 상관으로는 SheetIdentifierTracking·WindowsPersistSimpleIdentifiers가 항상 함께 나타나(반례 0, 역방향 0) 분리되지 않아 분리 실험을 돌렸다 — SIT만 뺀 변형은 **거부**, WPSI만 뺀 변형은 **열렸다**. worksheet/simple-id를 게이팅하는 것은 SIT 단독이고, 둘 다 요구한 최초안은 **과요구**였다(정상 파일을 때릴 수 있었다). WPSI는 이름과 실험 결과로 보아 window/simple-id를 게이팅할 것으로 보이나 **미실측이라 표에 넣지 않는다** — 저작본에 window/simple-id가 없어 실험이 그 자리를 건드리지 못했다. 부모 분포: window 3854 · worksheet 3737 · dashboard 117"
+    },
+    {
+      "element": "datagraph",
+      "requires": [
+        "DatagraphCoreV1"
+      ],
+      "symptom": "no declaration found for element 'datagraph'",
+      "source": "2026-09-16 실측 (MA_004 JWLH 260916 로드 거부 D2E8DA72). 거부 메시지가 요소를 직접 지목했다: no declaration found for element 'datagraph' / element 'datagraph' is not allowed for content model '(document-format-change-manifest,…,thumbnails?,external?)'. `<datagraph>`는 **동적 존 표시(Dynamic Zone Visibility)**의 저장 형식이다 — 사용자는 표시 유형 제어를 요구했고 Tableau가 이 형식으로 직렬화했다. 실파일 243개 상관: datagraph 보유 15개가 DatagraphCoreV1·DatagraphNodeSingleValueFieldV1·DatagraphNodeDashboardZoneVisibilityV1·ZoneVisibilityControl 4종을 **모두** 선언하고, 미보유 228개는 4종을 **하나도** 선언하지 않는다(양방향 반례 0). 네 항목이 완전히 동시출현해 코퍼스로는 분리되지 않는다 — simple-id 선례(과요구)를 피하려고 뭉뚱그리지 않고 **이름이 대응하는 요소에만** 걸었다. 05 F5-o"
+    },
+    {
+      "element": "single-value-field-node",
+      "requires": [
+        "DatagraphNodeSingleValueFieldV1"
+      ],
+      "symptom": "no declaration found for element 'single-value-field-node' (부모 datagraph 쪽이 먼저 지목된다)",
+      "source": "2026-09-16 실측 (MA_004 JWLH 260916 로드 거부 D2E8DA72). 거부 메시지가 요소를 직접 지목했다: no declaration found for element 'datagraph' / element 'datagraph' is not allowed for content model '(document-format-change-manifest,…,thumbnails?,external?)'. `<datagraph>`는 **동적 존 표시(Dynamic Zone Visibility)**의 저장 형식이다 — 사용자는 표시 유형 제어를 요구했고 Tableau가 이 형식으로 직렬화했다. 실파일 243개 상관: datagraph 보유 15개가 DatagraphCoreV1·DatagraphNodeSingleValueFieldV1·DatagraphNodeDashboardZoneVisibilityV1·ZoneVisibilityControl 4종을 **모두** 선언하고, 미보유 228개는 4종을 **하나도** 선언하지 않는다(양방향 반례 0). 네 항목이 완전히 동시출현해 코퍼스로는 분리되지 않는다 — simple-id 선례(과요구)를 피하려고 뭉뚱그리지 않고 **이름이 대응하는 요소에만** 걸었다. 05 F5-o ⚠️ 이 요소 단독 인과는 미실측 — 이름 대응(DatagraphNode<X>V1 ↔ <x-node>)과 15:0 상관으로 걸었다."
+    },
+    {
+      "element": "dashboard-zone-visibility-node",
+      "requires": [
+        "DatagraphNodeDashboardZoneVisibilityV1"
+      ],
+      "symptom": "no declaration found for element 'dashboard-zone-visibility-node' (부모 datagraph 쪽이 먼저 지목된다)",
+      "source": "2026-09-16 실측 (MA_004 JWLH 260916 로드 거부 D2E8DA72). 거부 메시지가 요소를 직접 지목했다: no declaration found for element 'datagraph' / element 'datagraph' is not allowed for content model '(document-format-change-manifest,…,thumbnails?,external?)'. `<datagraph>`는 **동적 존 표시(Dynamic Zone Visibility)**의 저장 형식이다 — 사용자는 표시 유형 제어를 요구했고 Tableau가 이 형식으로 직렬화했다. 실파일 243개 상관: datagraph 보유 15개가 DatagraphCoreV1·DatagraphNodeSingleValueFieldV1·DatagraphNodeDashboardZoneVisibilityV1·ZoneVisibilityControl 4종을 **모두** 선언하고, 미보유 228개는 4종을 **하나도** 선언하지 않는다(양방향 반례 0). 네 항목이 완전히 동시출현해 코퍼스로는 분리되지 않는다 — simple-id 선례(과요구)를 피하려고 뭉뚱그리지 않고 **이름이 대응하는 요소에만** 걸었다. 05 F5-o ⚠️ 이 요소 단독 인과는 미실측 — 이름 대응과 15:0 상관으로 걸었다."
     }
   ],
-
   "known_items_unmapped": {
-    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다. ParameterAction·ParameterActionClearSelection은 2026-07-30 실측 거부로 gates로 옮겼다. SheetIdentifierTracking은 2026-08-10 실측 거부(worksheet/simple-id)로 gates로 옮겼다 — 예고한 확보 경로가 그대로 작동했다. ObjectModelTableType·ObjectModelEncapsulateLegacy·SchemaViewerObjectModel은 2026-08-10 분리 실험 V3(로드 거부)로 gates(object-graph)로 옮겼다 — 셋 중 어느 것인지는 미분리다. VizInTooltipHideWorksheet은 2026-08-10 통제 관찰에서 새로 확보했다 — 도구 설명 뷰를 삽입하는 순간 붙는다(레시피 24). 대응 요소는 미상. WindowsPersistSimpleIdentifiers는 같은 날 분리 실험에서 **빼도 열렸다** — worksheet/simple-id의 게이트가 아님이 확정됐고, window/simple-id를 게이팅한다는 추정만 남아 여기 머문다(그 자리를 건드리는 실험 필요).",
+    "note": "규칙 ⑥-b. 표본 10개에서 관측된 매니페스트 항목 중 대응 요소를 아직 모르는 것들. 이름만 알고 매핑을 모르므로 검사에 쓸 수 없다. 확보 경로 = 주입 실험 B (docs/06-rule-candidates.md §D.1) — 로드 거부 메시지가 대응 요소를 직접 알려준다. ParameterAction·ParameterActionClearSelection은 2026-07-30 실측 거부로 gates로 옮겼다. SheetIdentifierTracking은 2026-08-10 실측 거부(worksheet/simple-id)로 gates로 옮겼다 — 예고한 확보 경로가 그대로 작동했다. ObjectModelTableType·ObjectModelEncapsulateLegacy·SchemaViewerObjectModel은 2026-08-10 분리 실험 V3(로드 거부)로 gates(object-graph)로 옮겼다 — 셋 중 어느 것인지는 미분리다. VizInTooltipHideWorksheet은 2026-08-10 통제 관찰에서 새로 확보했다 — 도구 설명 뷰를 삽입하는 순간 붙는다(레시피 24). 대응 요소는 미상. WindowsPersistSimpleIdentifiers는 같은 날 분리 실험에서 **빼도 열렸다** — worksheet/simple-id의 게이트가 아님이 확정됐고, window/simple-id를 게이팅한다는 추정만 남아 여기 머문다(그 자리를 건드리는 실험 필요). 2026-09-16: DatagraphCoreV1·DatagraphNodeSingleValueFieldV1·DatagraphNodeDashboardZoneVisibilityV1은 실측 거부(datagraph)로 gates로 옮겼다. **ZoneVisibilityControl은 옮기지 않았다** — 같은 15:0으로 붙어 다니지만 대응이 요소가 아니라 속성(`zone@hidden-by-user`, 정상본 15:0)이고 이 표는 요소 단위다. 속성 게이트가 필요해지면 그때 스키마를 넓힌다.",
     "items": [
       "AccessibleZoneTabOrder",
       "AnimationOnByDefault",
@@ -73,7 +111,8 @@
       "VizInTooltipHideWorksheet",
       "WindowsPersistSimpleIdentifiers",
       "WorksheetBackgroundTransparency",
-      "ZoneBackgroundTransparency"
+      "ZoneBackgroundTransparency",
+      "ZoneVisibilityControl"
     ]
   }
 }

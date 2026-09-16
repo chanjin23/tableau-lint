@@ -154,3 +154,52 @@ def test_missing_tree_reports_the_skip(rule: ManifestGatesRule) -> None:
 
     assert rule.check(ctx) == []
     assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.SKIPPED]
+
+
+# 2026-09-16 실측 — 동적 존 표시(datagraph) 게이트 (05 F5-o · 06 R33)
+
+
+@pytest.mark.parametrize(
+    ("element", "item"),
+    [
+        ("datagraph", "DatagraphCoreV1"),
+        ("single-value-field-node", "DatagraphNodeSingleValueFieldV1"),
+        ("dashboard-zone-visibility-node", "DatagraphNodeDashboardZoneVisibilityV1"),
+    ],
+)
+def test_datagraph_gates(rule: ManifestGatesRule, element: str, item: str) -> None:
+    """`<datagraph>`는 **동적 존 표시**의 저장 형식이다 (2026-09-16 MA_004 로드 거부).
+
+    거부 메시지가 요소를 직접 지목했다:
+    `no declaration found for element 'datagraph'`.
+    """
+    ctx = make_ctx(make_twb(extra_body=f"<{element} />"))
+
+    findings = [f for f in rule.check(ctx) if f.location == element]
+
+    assert [f.severity for f in findings] == [Severity.ERROR]
+    assert item in findings[0].message
+
+
+def test_datagraph_gates_are_not_lumped_together(rule: ManifestGatesRule) -> None:
+    """네 항목이 완전히 동시출현(15:0)해도 **뭉뚱그려 요구하지 않는다**.
+
+    `simple-id`에서 과요구가 드러난 전례가 있다 — 이름이 대응하는 요소에만 건다.
+    `<datagraph>`만 쓰는 파일에 노드 항목까지 요구하면 정상 파일을 때릴 수 있다.
+    """
+    ctx = make_ctx(make_twb(manifest=("DatagraphCoreV1",), extra_body="<datagraph />"))
+
+    assert [f for f in rule.check(ctx) if f.location == "datagraph"] == []
+
+
+def test_zone_visibility_control_stays_unmapped(rule: ManifestGatesRule) -> None:
+    """`ZoneVisibilityControl`은 표에 넣지 않았다 — 대응이 요소가 아니라 속성이다.
+
+    정상본 15:0으로 `zone@hidden-by-user`와 붙어 다니지만, 이 표는 요소 단위라
+    담을 자리가 없다. **모른다고 말한다** — `known_items_unmapped`에 남겨
+    `note_partial`로 보고된다 (02 AC9).
+    """
+    ctx = make_ctx(make_twb(extra_body="<zone hidden-by-user='true' id='9' />"))
+
+    assert [f for f in rule.check(ctx) if "ZoneVisibilityControl" in f.message] == []
+    assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.PARTIAL]

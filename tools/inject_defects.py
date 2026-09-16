@@ -514,6 +514,20 @@ def _r32_drop_paramctrl_mode(root: Any) -> str | None:
     return None
 
 
+def _r33_drop_datagraph_core(root: Any) -> str | None:
+    """R33 — `DatagraphCoreV1` 삭제. `<datagraph>`는 그대로 둔다.
+
+    `<datagraph>`는 **동적 존 표시(Dynamic Zone Visibility)**의 저장 형식이다.
+    기능을 쓰면서 항목을 선언하지 않으면 로드 거부된다 (05 F5-o).
+    """
+    uses = any(
+        isinstance(el.tag, str) and fcp.strip_prefix(el.tag) == "datagraph" for el in root.iter()
+    )
+    if not uses:
+        return None
+    return _drop_manifest_item(root, lambda tag: fcp.strip_prefix(tag) == "DatagraphCoreV1")
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
@@ -668,6 +682,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 — 증상 미확인. 모양 불변식만 선 규칙이다 (05 F5-n)",
         source="docs/05-xsd-spike.md F5-n (2026-09-14 MA_004 실측)",
         mutate=_r32_drop_paramctrl_mode,
+    ),
+    Recipe(
+        id="R33-drop-DatagraphCoreV1",
+        rule="manifest.gates",
+        expected="로드 거부 D2E8DA72: no declaration found for element 'datagraph'",
+        source="docs/05-xsd-spike.md F5-o (2026-09-16 MA_004 JWLH 실측)",
+        mutate=_r33_drop_datagraph_core,
     ),
 )
 

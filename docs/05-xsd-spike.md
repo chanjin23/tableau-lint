@@ -885,6 +885,79 @@ F5의 매니페스트 게이팅과는 또 다른 경로의 "XSD 통과 ≠ 열�
 5,584·3,336건 어긋난다(238/238 파일). 존 트리의 부모-자식 종류 조합에서 0건짜리가
 셋 나왔지만 조합 희소성이라 단독으로는 약하다.
 
+### F5-o. 동적 존 표시 = `<datagraph>` — 게이트 3쌍 추가 (2026-09-16, 규칙 ⑥)
+
+사용자 저작본 `MA_004_…_JWLH_260916.twbx`가 로드 거부됐다. 린터는
+`passed=True · findings=0`(WARNING 1건은 기준선) — AC3 위반이다.
+
+```
+오류 코드: D2E8DA72
+Error(18998,14): no declaration found for element 'datagraph'
+Error(19234,12): element 'datagraph' is not allowed for content model
+  '(document-format-change-manifest,repository-location?,preferences,style-theme?,
+    style,local-data?,datasources?,datasource-relationships?,mapsources?,
+    shared-views?,actions?,worksheets?,dashboards?,windows?,thumbnails?,external?)'
+```
+
+**F5의 정본 패턴이다** — 거부 메시지가 요소를 직접 지목한다. 06 §D.1이 예고한
+*"로드 거부 메시지가 대응 요소를 직접 알려준다"*가 또 한 번 그대로 작동했다.
+
+**`<datagraph>`는 동적 존 표시(Dynamic Zone Visibility)의 저장 형식이다.** 사용자의
+말이 이 귀속을 확정했다 — *"내가 표시 유형 제어를 요구했는데 datagraph를 썼네"*.
+AI가 엉뚱한 기능을 쓴 것이 아니라 그 기능의 직렬화가 이 모양이다. 내용이 그대로 말한다:
+
+```xml
+<datagraph><graph>
+  <nodes>
+    <single-value-field-node fieldname="[…].[Calculation_72…072]" …/>
+    <dashboard-zone-visibility-node dashboard-identifier="{9E8D…}" zone-id="…" …/>
+  </nodes>
+  <edges>…</edges>
+</graph></datagraph>
+```
+
+필드 값 노드 → 존 가시성 노드로 이어지는 그래프다. 06 **R8**이 *"`<datagraph>`
+(동적 존 표시) 삽입 [보류]"*로 적어 둔 항목이고, 여기서 표본이 생겼다.
+
+대조 (실파일 243개):
+
+| | datagraph 보유 15개 | 미보유 228개 |
+|---|---|---|
+| `DatagraphCoreV1` | **15** | **0** |
+| `DatagraphNodeSingleValueFieldV1` | **15** | **0** |
+| `DatagraphNodeDashboardZoneVisibilityV1` | **15** | **0** |
+| `ZoneVisibilityControl` | **15** | **0** |
+
+**양방향 반례 0.** 깨진 파일에는 넷 다 없다.
+
+⚠️ **네 항목이 완전히 동시출현해 코퍼스로는 분리되지 않는다** — `simple-id`와 같은
+상황이고, 거기서 *"둘 다 요구"*가 과요구로 드러난 전례가 있다 (F5의 2026-08-10 실험).
+그래서 **뭉뚱그리지 않고 이름이 대응하는 요소에만** 걸었다:
+
+| 요소 | 요구 항목 |
+|---|---|
+| `<datagraph>` | `DatagraphCoreV1` |
+| `<single-value-field-node>` | `DatagraphNodeSingleValueFieldV1` |
+| `<dashboard-zone-visibility-node>` | `DatagraphNodeDashboardZoneVisibilityV1` |
+
+`DatagraphNode<X>V1` ↔ `<x-node>`라는 이름 대응이 이례적으로 명확해서 가능했다.
+거부 메시지가 실측으로 지목한 것은 `datagraph` 하나뿐이고, 나머지 둘은 **이름 대응 +
+15:0 상관**이다 — 그 사실을 `manifest_gates.json`의 `source`에 적어 뒀다.
+
+**`ZoneVisibilityControl`은 표에 넣지 않았다.** 같은 15:0으로 붙어 다니지만 대응이
+요소가 아니라 **속성**(`zone@hidden-by-user`, 정상본 15:0)이고 이 표는 요소 단위다.
+`known_items_unmapped`에 넣어 `note_partial`로 보고한다 (11 → 12종). 속성 게이트가
+필요해지면 그때 스키마를 넓힌다 — 지금 넓히면 근거 없는 자리가 늘어난다.
+
+⚠️ **골든셋 라벨이 오염됐다.** 이 깨진 파일이 `MA_004_경영관리-재무-손익계산서/`
+안에 있어서 `CLAUDE.md`의 골든셋 glob(`MA_00*/*.twbx`)이 **정상본으로 집어 든다.**
+게이트를 돌리면 AC7 테스트가 이 파일로 깨진다 — 규칙이 틀린 것이 아니라 라벨이 틀린
+것이다. 그 폴더의 나머지 5개는 전부 ERROR 0이다.
+
+→ 규칙 ⑥ 게이트 3쌍 추가 (**ERROR**). 주입 레시피 R33.
+`known_items_unmapped` 11 → 12종 (Datagraph 3종은 애초에 목록에 없었고 —
+표본 10개에 datagraph 파일이 없었다 — `ZoneVisibilityControl`이 새로 들어왔다).
+
 ## F6. 부수 관측 — Tableau 설치본에 로더의 실제 XSD가 들어 있다
 
 `C:\Program Files\Tableau\Tableau 2026.1\bin\res\tablangres.rcc` (26MB, Qt 리소스)에
