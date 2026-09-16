@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'C:\\dev\\claude\\tableau-lint\\.codex\\hooks\\log-tool.sh'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'C:\\dev\\claude\\tableau-lint\\.codex\\hooks\\log-prompt.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

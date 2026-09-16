@@ -14,8 +14,10 @@ dist/
 .ruff_cache/
 .pytest_cache/
 
-# Claude Code 로컬 런타임 로그 (훅이 생성, 세션마다 증가 — 커밋 안 함)
+# 에이전트 로컬 런타임 로그 (훅이 생성, 세션마다 증가 — 커밋 안 함)
+# 프롬프트 원문·툴 입력이 그대로 들어간다 — 골든셋 경로 등 사내 정보가 섞인다
 .claude/logs/
+.codex/logs/
 
 # OS / editor
 .DS_Store
