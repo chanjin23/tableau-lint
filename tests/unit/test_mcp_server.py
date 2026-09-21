@@ -35,8 +35,9 @@ def test_server_instructions_route_all_four_tools() -> None:
 
 
 def test_validate_returns_the_gate_verdict(tmp_path: Path) -> None:
+    # 워크시트 1개는 "통과하는 워크북"의 최소 조건이다 — 0개는 규칙 ⑱이 막는다.
     src = tmp_path / "wb.twb"
-    src.write_text(make_twb(), encoding="utf-8")
+    src.write_text(make_twb(worksheets=("Sheet1",)), encoding="utf-8")
 
     result = server.twb_validate(str(src))
 

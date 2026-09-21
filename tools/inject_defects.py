@@ -528,12 +528,54 @@ def _r33_drop_datagraph_core(root: Any) -> str | None:
     return _drop_manifest_item(root, lambda tag: fcp.strip_prefix(tag) == "DatagraphCoreV1")
 
 
+def _r34_empty_worksheets(root: Any) -> str | None:
+    """R34 — `<worksheets>`의 자식을 전부 지운다 → 워크시트 0개.
+
+    **증상이 조용하다.** 오류 대화상자가 없고 Tableau가 빈 워크북(`문서1`)을 대신
+    띄운다 — 창 제목으로만 구분된다 (05 F5-p).
+
+    ⚠️ **이 레시피는 층을 하나만 만들지 못한다.** 워크시트를 지우면 대시보드 존과
+    window가 없는 시트를 가리키게 되어 규칙 ③(`named.refs`)도 함께 운다(실측 47건).
+    실파일에서 워크시트만 홀로 사라지는 일이 없으니 당연한 결과다 — 실패02는 애초에
+    존이 시트를 안 쓰는 레이아웃 전용 대시보드였다. ⑱의 검출을 보려면 `workbook.shape`
+    finding을 직접 확인한다(검출 테스트가 그렇게 한다).
+    """
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "worksheets":
+            continue
+        sheets = list(el)
+        if not sheets:
+            return None
+        for sheet in sheets:
+            el.remove(sheet)
+        return f"워크시트 {len(sheets)}개 전부 삭제 (<worksheets />만 남긴다)"
+    return None
+
+
+def _r35_drop_accessible_zone_taborder(root: Any) -> str | None:
+    """R35 — `AccessibleZoneTabOrder` 삭제. `dashboard@enable-sort-zone-taborder`는 남긴다.
+
+    **매니페스트가 여는 것은 요소만이 아니다** — 거부 메시지가 속성을 지목한다
+    (05 F5-p): `attribute 'enable-sort-zone-taborder' is not declared for
+    element 'dashboard'`.
+    """
+    uses = any(
+        isinstance(el.tag, str)
+        and fcp.strip_prefix(el.tag) == "dashboard"
+        and el.get("enable-sort-zone-taborder") is not None
+        for el in root.iter()
+    )
+    if not uses:
+        return None
+    return _drop_manifest_item(root, lambda tag: fcp.strip_prefix(tag) == "AccessibleZoneTabOrder")
+
+
 RECIPES: tuple[Recipe, ...] = (
     Recipe(
         id="R1a-drop-fcp-manifest-item",
         rule="manifest.gates",
-        expected="로드 거부 (미검증 — 실험 A가 확정한다)",
-        source="docs/05-xsd-spike.md F7 / docs/06-rule-candidates.md R1-a",
+        expected="로드 거부: 오류 대화상자 `동작을 완료할 수 없습니다.` (2026-09-21 실험 A 실측)",
+        source="docs/05-xsd-spike.md F5-p / docs/06-rule-candidates.md R1-a",
         mutate=_r1a_drop_fcp_item,
     ),
     Recipe(
@@ -689,6 +731,23 @@ RECIPES: tuple[Recipe, ...] = (
         expected="로드 거부 D2E8DA72: no declaration found for element 'datagraph'",
         source="docs/05-xsd-spike.md F5-o (2026-09-16 MA_004 JWLH 실측)",
         mutate=_r33_drop_datagraph_core,
+    ),
+    Recipe(
+        id="R34-empty-worksheets",
+        rule="workbook.shape",
+        expected="오류 대화상자 없이 빈 워크북(`문서1`)으로 대체된다 — 창 제목으로만 구분된다",
+        source="docs/05-xsd-spike.md F5-p (2026-09-21 실패02 실측)",
+        mutate=_r34_empty_worksheets,
+    ),
+    Recipe(
+        id="R35-drop-AccessibleZoneTabOrder",
+        rule="manifest.gates",
+        expected=(
+            "로드 거부 D2E8DA72: attribute 'enable-sort-zone-taborder' "
+            "is not declared for element 'dashboard'"
+        ),
+        source="docs/05-xsd-spike.md F5-p (2026-09-21 실패03 실측)",
+        mutate=_r35_drop_accessible_zone_taborder,
     ),
 )
 

@@ -1,7 +1,7 @@
 """규칙 ⑥(`manifest.gates`) — 매니페스트 게이트 일관성.
 
-두 갈래의 **심각도가 다르다는 것**이 이 규칙의 핵심이다. ⑥-b는 로드 거부 메시지를
-실측했으므로 ERROR, ⑥-a는 관계만 확인하고 인과는 미검증이라 WARNING이다.
+세 갈래다 — ⑥-a(fcp 요소) · ⑥-b(요소 이름) · ⑥-c(요소의 **속성**). 전부 ERROR이고,
+근거는 갈래마다 다른 실측이다. ⑥-a는 2026-09-21 실험 A로 마지막에 승격됐다.
 
 입력 트리 선택(⑥-a는 정규화 **전**)은 `test_rules_contract.py`가 호출 감시로 잡는다.
 """
@@ -31,13 +31,18 @@ def test_declared_fcp_feature_is_silent(rule: ManifestGatesRule) -> None:
     assert [f for f in rule.check(ctx) if f.location.startswith("fcp:")] == []
 
 
-def test_undeclared_fcp_feature_is_a_warning(rule: ManifestGatesRule) -> None:
-    """관계는 표본 10/10에서 확인했지만 **인과는 미검증**이다 — ERROR로 올리지 않는다."""
+def test_undeclared_fcp_feature_is_an_error(rule: ManifestGatesRule) -> None:
+    """**2026-09-21 실험 A로 인과가 확정돼 ERROR가 됐다** (05 F5-p · 06 R1-a).
+
+    항목 한 줄만 다른 파일 두 개를 열어 비교했다 — 항목이 없는 쪽만 오류 대화상자
+    `동작을 완료할 수 없습니다.`로 거부됐고, 넣은 쪽은 그 대화상자가 사라졌다.
+    06 R1-a가 *"확정되면 ERROR"*라고 예고한 승격이다.
+    """
     ctx = make_ctx(make_twb(fcp_elements=("RoundedCorners",)))
 
     findings = [f for f in rule.check(ctx) if f.location.startswith("fcp:")]
 
-    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert [f.severity for f in findings] == [Severity.ERROR]
     assert "_.fcp.RoundedCorners.true...RoundedCorners" in findings[0].message
 
 
@@ -138,7 +143,7 @@ def test_elements_outside_the_table_are_not_guessed(rule: ManifestGatesRule) -> 
 
 
 def test_unmapped_items_are_reported_as_partial_coverage(rule: ManifestGatesRule) -> None:
-    """이름만 알고 매핑을 모르는 항목 12종은 **검사할 수 없다** — 그 사실을 보고한다."""
+    """이름만 알고 매핑을 모르는 항목 11종은 **검사할 수 없다** — 그 사실을 보고한다."""
     ctx = make_ctx(make_twb())
 
     rule.check(ctx)
@@ -203,3 +208,61 @@ def test_zone_visibility_control_stays_unmapped(rule: ManifestGatesRule) -> None
 
     assert [f for f in rule.check(ctx) if "ZoneVisibilityControl" in f.message] == []
     assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.PARTIAL]
+
+
+# 2026-09-21 실측 — 속성 게이트 (05 F5-p · 06 R35)
+
+
+def test_attribute_gate_violation_is_an_error(rule: ManifestGatesRule) -> None:
+    """⑥-c — **매니페스트가 여는 것은 요소만이 아니다.**
+
+    실패03이 이 자리다 (D2E8DA72). 거부 메시지가 요소가 아니라 **속성**을 지목했다:
+    `Error(40,69): attribute 'enable-sort-zone-taborder' is not declared for
+    element 'dashboard'`. 정상 동작하는 파일에서 이 속성 하나만 되돌려 만든
+    파일이라 단일 변수로 분리돼 있다.
+    """
+    ctx = make_ctx(make_twb(extra_body="<dashboard enable-sort-zone-taborder='true' />"))
+
+    findings = [f for f in rule.check(ctx) if f.location == "dashboard@enable-sort-zone-taborder"]
+
+    assert [f.severity for f in findings] == [Severity.ERROR]
+    assert "AccessibleZoneTabOrder" in findings[0].message
+
+
+def test_attribute_gate_satisfied_is_silent(rule: ManifestGatesRule) -> None:
+    ctx = make_ctx(
+        make_twb(
+            manifest=("AccessibleZoneTabOrder",),
+            extra_body="<dashboard enable-sort-zone-taborder='true' />",
+        )
+    )
+
+    assert [f for f in rule.check(ctx) if f.location.startswith("dashboard@")] == []
+
+
+def test_attribute_gate_looks_at_the_attribute_not_the_element(rule: ManifestGatesRule) -> None:
+    """**존재 축으로는 안 잡힌다** — `<dashboard>`는 정상본에 흔하다 (⑰의 교훈).
+
+    속성이 없는 대시보드는 이 항목을 요구하지 않는다. 요소만 보고 걸면 대시보드를
+    가진 정상 파일을 전부 때린다 (AC7).
+    """
+    ctx = make_ctx(make_twb(extra_body="<dashboard name='대시보드' />"))
+
+    assert [f for f in rule.check(ctx) if f.location.startswith("dashboard@")] == []
+
+
+def test_attribute_gate_carries_the_first_occurrence_line(rule: ManifestGatesRule) -> None:
+    """거부 메시지가 `Error(40,69)`처럼 줄·열을 준다 — 대조하려면 줄번호가 있어야 한다."""
+    ctx = make_ctx(
+        make_twb(
+            extra_body=(
+                "<dashboard enable-sort-zone-taborder='true' />"
+                "<dashboard enable-sort-zone-taborder='true' />"
+            )
+        )
+    )
+
+    findings = [f for f in rule.check(ctx) if f.location.startswith("dashboard@")]
+
+    assert len(findings) == 1, "속성이 여러 번 나와도 고칠 곳은 매니페스트 1군데다"
+    assert findings[0].line is not None

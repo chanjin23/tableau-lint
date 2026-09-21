@@ -26,7 +26,7 @@
 | `input.readable` | 층 0 — 입력 | ERROR |
 | `xsd.schema` (L-A) | T1 | ERROR/WARNING 혼합 |
 | `named.refs` | T1 — zone·worksheet·viewpoint·window 4자 일치 | ERROR |
-| `manifest.gates` | T1 — 매니페스트 게이트 | ⑥-b ERROR / ⑥-a WARNING |
+| `manifest.gates` | T1 — 매니페스트 게이트 (⑥-a fcp · ⑥-b 요소 · **⑥-c 속성**) | 전부 ERROR |
 | `ref.notation` | T1·T2·T4 — 표기 정합 (⑦-a·b·c·d·**e** 정렬) | ERROR/WARNING |
 | `calc.functions` | T2 — 함수 화이트리스트 | WARNING |
 | `calc.field_refs` | T2 — dangling 참조 | WARNING |
@@ -126,8 +126,9 @@ D3은 뷰 그레인을 정적으로 구할 수 있는지부터 정해야 하므�
 - [ ] **L1. T4 조합 규칙 정답지** — 어떤 필드×선반 조합이 빨간 느낌표를 내는지는
       XSD에도 매니페스트에도 없다. Tableau에서 조합을 열어 봐야 규칙 근거가 선다.
       **T4의 절반(조합)이 여기 매달려 있다.** 참조 무결성 절반은 라벨 없이 간다
-- [ ] **L2. 심각도 승격** — `manifest.gates` ⑥-a WARNING→ERROR ·
-      `calc.field_refs` 표면별 ERROR 승격(dangling 0인 표면 4종).
+- [ ] **L2. 심각도 승격** — ~~`manifest.gates` ⑥-a WARNING→ERROR~~ ✅ 2026-09-21
+      (실험 A 실행: 항목 한 줄만 다른 A/B 쌍 중 없는 쪽만 거부 — 05 F5-p) ·
+      남은 것: `calc.field_refs` 표면별 ERROR 승격(dangling 0인 표면 4종).
       **그때까지 현재 심각도로 동결한다**
 - [ ] **L3. 수치 확정** — AC2(커버리지)·AC5(속도) baseline 1회 계측
 - [x] **L4. `simple-id` 게이트 분리 실험** ✅ 2026-08-10 — SIT만 빼면 거부,

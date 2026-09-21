@@ -21,7 +21,7 @@ def test_clean_file_passes_with_exit_zero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     src = tmp_path / "wb.twb"
-    src.write_text(make_twb(), encoding="utf-8")
+    src.write_text(make_twb(worksheets=("Sheet1",)), encoding="utf-8")
 
     assert cli.main(["validate", str(src)]) == 0
     assert "PASS" in capsys.readouterr().out
@@ -50,7 +50,7 @@ def test_output_survives_a_non_utf8_console(
         sys, "stderr", io.TextIOWrapper(io.BytesIO(), encoding="cp949", errors="strict")
     )
     src = tmp_path / "wb.twb"
-    src.write_text(make_twb(), encoding="utf-8")
+    src.write_text(make_twb(worksheets=("Sheet1",)), encoding="utf-8")
 
     exit_code = cli.main(["validate", str(src)])
     sys.stdout.flush()

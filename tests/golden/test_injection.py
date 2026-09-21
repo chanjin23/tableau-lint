@@ -5,7 +5,8 @@
 
 - R4·R7 → L-A(XSD)가 잡는다
 - R1a·R1b·R2·R3 → **L-A를 그대로 통과한다** = AC3 무거짓통과 위반의 실증.
-  L-B 규칙이 없으면 이 파일들은 게이트를 통과하고 Tableau에서 열리지 않는다
+  L-B 규칙이 없으면 이 파일들은 게이트를 통과하고 Tableau에서 열리지 않는다.
+  2026-09-21 기준 네 레시피 전부 L-B가 ERROR로 막는다 — R1a가 마지막이었다
 
 골든셋이 없으면 skip 된다 (tests/conftest.py).
 """
@@ -42,10 +43,10 @@ CAUGHT_BY_NAMED_REFS = {"R2-drop-viewpoint", "R3-dangling-zone"}
 # 규칙 ⑥-b가 잡는 레시피 (대응표 2쌍 중 하나).
 CAUGHT_BY_MANIFEST = {"R1b-drop-SortTagCleanup"}
 
-# 게이트를 통과하는 유일한 레시피. **의도된 상태다** — ⑥-a는 관계만 확인했고
-# "항목을 지우면 실제로 로드가 거부된다"는 인과가 미검증이라 WARNING이다 (05 F7).
-# 실험 A(TODO D)로 인과가 확정되면 ERROR로 올리고 이 테스트를 검출 단언으로 바꾼다.
-WARNING_ONLY = {"R1a-drop-fcp-manifest-item"}
+# 2026-09-21: **게이트를 통과하는 레시피는 이제 없다.** ⑥-a가 ERROR로 올라가면서
+# R1a도 막힌다 — 실험 A가 실행됐다(05 F5-p). 이 집합을 비워 두는 것이 아니라 지운
+# 이유는, 빈 집합이면 아래 검출 테스트가 **조용히 0회 도는** 테스트가 되기 때문이다.
+CAUGHT_BY_FCP_GATE = {"R1a-drop-fcp-manifest-item"}
 
 
 def _load_injector() -> Any:
@@ -218,19 +219,23 @@ def test_manifest_gate_catches_the_mapped_recipe(broken_set: dict[str, Path]) ->
         assert any(f.rule_id == "manifest.gates" for f in report.errors)
 
 
-@pytest.mark.stub
-def test_fcp_recipe_warns_but_does_not_block(broken_set: dict[str, Path]) -> None:
-    """R1a — **의도적으로 WARNING이다.** 관계는 표본 10/10에서 확인했지만, 항목을
-    지우면 실제로 로드가 거부되는지(인과)는 확인하지 못했다.
+def test_fcp_recipe_now_fails_the_gate(broken_set: dict[str, Path]) -> None:
+    """R1a — **실험 A가 실행돼 ERROR가 됐다** (2026-09-21, 05 F5-p · 06 R1-a).
 
-    실험 A(TODO D)로 인과가 확정되면 ERROR로 올린다 — 그때 이 테스트를 검출 단언으로
-    바꾼다. 지금 ERROR로 올리면 우리 추론이 남의 정상 파일을 막는다.
+    이 테스트는 원래 `@pytest.mark.stub`으로 *"WARNING이라 막지 않는다"*를 고정하고
+    있었다. 06 R1-a가 *"인과 확정 전까지 WARNING, 확정되면 ERROR"*라고 예고했고,
+    사용자가 항목 한 줄만 다른 파일 두 개를 열어 그 인과를 확정했다 — 항목이 없는
+    쪽만 오류 대화상자 `동작을 완료할 수 없습니다.`로 거부됐다.
+
+    **stub 테스트가 반대 방향 단언으로 뒤집힌 세 번째 자리다.** 예고된 승격이
+    실제로 일어났는지를 여기가 지킨다.
     """
     from twb_lint.validation import engine
 
-    for recipe_id in WARNING_ONLY & broken_set.keys():
+    for recipe_id in CAUGHT_BY_FCP_GATE & broken_set.keys():
         report = engine.validate(broken_set[recipe_id])
-        assert report.passed is True, f"{recipe_id}가 이제 막힌다 — 검출 단언으로 바꾼다"
-        assert any(f.rule_id == "manifest.gates" for f in report.findings), (
-            f"{recipe_id}에 대해 규칙 ⑥이 아무 말도 하지 않았다"
-        )
+        assert not report.passed, f"{recipe_id}가 게이트를 통과했다"
+        assert any(
+            f.rule_id == "manifest.gates" and f.location.startswith("fcp:")
+            for f in report.errors
+        ), f"{recipe_id}를 막은 것이 ⑥-a가 아니다"
