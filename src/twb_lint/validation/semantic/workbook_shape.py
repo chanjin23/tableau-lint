@@ -1,44 +1,45 @@
-"""L-B rule ⑱: 워크북 골격 — 워크시트가 최소 1개 있어야 한다.
+"""L-B rule ⑱: 워크북 골격 — `<worksheets>`가 **있는데 비어 있으면** 안 된다.
 
 **증상이 조용하다.** 로드 거부 대화상자가 뜨지 않는다 — Tableau는 아무 말 없이
 빈 워크북(`문서1`)을 대신 띄운다. 창 제목이 `Tableau - <파일명>`이 되지 않고
 `Tableau - 문서1`에 머무는 것이 유일한 표시다. 저작 루프에서 가장 놓치기 쉬운 층이다.
 
-```xml
-<worksheets />          <!-- 실패02: 요소는 있는데 비었다 -->
-<dashboards>…</dashboards>   <!-- 대시보드는 145개 존을 갖고 있다 -->
-```
+## 이 규칙의 핵심은 **워크시트 개수가 아니다**
 
-2026-09-21 실측 (05 F5-p) — **층이 벗겨지는 것으로 인과가 확정됐다**:
+최초안은 *"워크시트가 0개면 ERROR"*였고, **틀렸다.** 실파일 303개를 두 모양으로
+가르면 반대 방향으로 깨끗하게 갈린다 (2026-09-21 실측):
 
-| 파일 | `<worksheets>` | Tableau |
+| 모양 | 실파일 | Tableau |
 |---|---|---|
-| 실패02 | 비어 있음 | 조용히 `문서1`로 대체 |
-| 실패03 (= 실패02 + 시트 1개) | 시트 1개 | **증상이 바뀐다** — 대체 대신 로드 거부(D2E8DA72) |
+| `<worksheets><worksheet …/></worksheets>` | 285 | 정상 |
+| **`<worksheets />`** (요소는 있는데 비었다) | **2** — 실패01·실패02뿐 | **안 열린다** |
+| `<worksheets>` 요소 자체가 없다 | **16** — 전부 KPMG 템플릿 | **열린다** ✅ 사용자 확인 |
 
-증상이 사라진 게 아니라 **다음 층**(⑥ 속성 게이트)이 드러났다. 한 층을 고치면
-다음 층이 보인다는 이 프로젝트의 전제 그대로다 (01 v2.0 · 05 F5).
+워크시트 0개인 파일이 18개인데 그중 16개가 **정상적으로 열린다.** 개수로 걸었으면
+그 16개가 전부 거짓 ERROR였다 — AC7 붕괴다.
 
-**ERROR다.** 층 1(파일이 안 열린다)이고, 인과가 A/B로 확정됐다.
+가르는 것은 **스키마다.** `<worksheets>`는 선택 요소지만(minOccurs=0), *있으면*
+`<worksheet>`를 최소 1개 요구한다. 그래서 `<worksheets />`는 구문 위반이고 요소
+생략은 유효하다. 로더가 그 차이를 그대로 반영한다.
 
-상관 — 실파일 253개 중 워크시트 0개는 **1개**뿐이다(`MA_015…/old/…템플릿_260702.twbx`).
-그 1개는 이 파일과 **같은 모양**이다: 대시보드만 있고 워크시트가 없다. 정상본이라는
-라벨이 붙은 적 없는 `old/` 폴더의 템플릿이라, 반례가 아니라 **같은 결함의 두 번째
-표본**으로 본다 (규칙 ⑥ 30번 반복의 '골든셋 라벨 오염'과 같은 판단). 골든셋 회귀
-테스트(`test_inspector_extracts_a_non_empty_model_from_every_workbook`)는 이미
-`assert model.worksheets`로 이 불변식을 정상본에 걸고 있었다 — 규칙이 그 단언을
-따라잡은 것이다.
+## 인과
 
-⚠️ **L-A는 절반만 잡고, 그마저 WARNING이다.** `<worksheets />`가 비면 XSD가
-`Missing child element(s)`를 내지만 그 클래스는 `explain-data` 거짓양성과 같은
-오류코드를 써서 WARNING으로 떨어진다 (05 F3·F8, A3 정책). 게다가 `<worksheets>`
-요소가 **통째로 없으면** XSD는 아예 침묵한다 — 선택 요소이기 때문이다. 두 모양 모두
-워크시트 0개라는 같은 결함이므로 여기서 함께 잡는다.
+- 실패02(`<worksheets />`)를 열면 조용히 `문서1`로 대체된다
+- 여기에 워크시트 1개를 넣은 실패03은 **증상이 바뀐다** — 대체가 사라지고 다음 층
+  (⑥-c 속성 게이트)의 로드 거부가 뜬다. 그 층까지 고치자 **열렸다**
+
+한 층을 고치면 다음 층이 보인다는 이 프로젝트의 전제 그대로다 (01 v2.0 · 05 F5-p).
+
+## 왜 L-A에 맡기지 않는가
+
+`<worksheets />`는 XSD가 `Missing child element(s)`로 잡기는 한다. 하지만 그 클래스는
+`explain-data` 거짓양성과 **같은 오류코드·같은 문구**를 써서 A3 정책이 통째로
+WARNING으로 떨어뜨린다 (05 F3·F8). 정책을 흔들면 정상본이 무너지므로
+(`tests/unit/test_severity_policy.py`가 그 한 줄을 지킨다), **`worksheets` 자리
+하나만** 실측 근거로 ERROR를 내는 좁은 규칙을 따로 둔다.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 from twb_lint.models import Finding, Severity
 from twb_lint.validation.context import ValidationContext
@@ -56,7 +57,19 @@ class WorkbookShapeRule(RuleBase):
             ctx.note_skip(self.id, "트리를 파싱하지 못해 워크북 골격을 검사하지 못했다")
             return []
 
-        if _worksheet_count(ctx.raw_tree):
+        block = ctx.raw_tree.find("worksheets")
+        if block is None:
+            # 요소 생략은 유효하다 — 실파일 16개(KPMG 템플릿)가 이 모양으로 **열린다**.
+            # 여기서 ERROR를 내면 그 16개가 전부 거짓양성이 된다 (AC7).
+            ctx.note_skip(
+                self.id,
+                "`<worksheets>` 요소가 없다 — 선택 요소이고 실측 16개가 이 모양으로 "
+                "정상 로드되므로 판정 대상이 아니다",
+                scope="worksheets",
+            )
+            return []
+
+        if len(block.findall("worksheet")):
             return []
 
         return [
@@ -64,28 +77,17 @@ class WorkbookShapeRule(RuleBase):
                 severity=Severity.ERROR,
                 rule_id=self.id,
                 location="workbook/worksheets",
-                line=_worksheets_line(ctx.raw_tree),
+                line=block.sourceline,
                 message=(
-                    "워크북에 워크시트가 하나도 없다 — Tableau가 이 파일 대신 "
-                    "빈 워크북(`문서1`)을 띄운다. 오류 대화상자가 뜨지 않아 "
-                    "성공으로 오인하기 쉽다"
+                    "`<worksheets>`가 비어 있다 — Tableau가 이 파일 대신 빈 "
+                    "워크북(`문서1`)을 띄운다. 오류 대화상자가 뜨지 않아 성공으로 "
+                    "오인하기 쉽다"
                 ),
                 fix=(
-                    "`<worksheets>` 아래에 워크시트를 최소 1개 넣는다. 대시보드만 "
-                    "필요하더라도 자리표시 시트가 있어야 하며, 그 시트는 "
+                    "`<worksheets>` 아래에 워크시트를 최소 1개 넣는다 — 그 시트는 "
                     "`<windows>`에 `<window class='worksheet'>`로도 나타나야 한다 "
-                    "(규칙 ③)."
+                    "(규칙 ③). 대시보드 레이아웃만 담는 템플릿이라면 `<worksheets>` "
+                    "요소 자체를 **빼는** 것도 유효하다 (실측 16개가 그 모양이다)."
                 ),
             )
         ]
-
-
-def _worksheet_count(root: Any) -> int:
-    """`<workbook>/<worksheets>/<worksheet>` 개수. 요소가 없으면 0이다."""
-    return len(root.findall("worksheets/worksheet"))
-
-
-def _worksheets_line(root: Any) -> int | None:
-    """`<worksheets>`가 있으면 그 줄. 통째로 없으면 None (짚을 자리가 없다)."""
-    block = root.find("worksheets")
-    return None if block is None else block.sourceline
