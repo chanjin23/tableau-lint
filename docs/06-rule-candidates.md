@@ -923,3 +923,25 @@ ERROR가 주장하는 것은 앞줄이고, 뒷줄의 추론분은 `fix` 문구�
 **`ZoneVisibilityControl` ↔ `zone@hidden-by-user`는 표에 넣지 않았다.** 담을 자리는
 이제 생겼지만 15:0 상관만 있고 거부 메시지 실측이 없다. **자리가 생겼다고 추측을 표에
 넣지 않는다** (S1-6). 주입 레시피 R35 추가.
+
+---
+
+## R36 — 데이터원본 팔레트 키의 직속 `column-instance` 누락 → ✅ **규칙 ⑲ `palette.instance_declared`** (2026-10-13)
+
+- **증상**: 오류 없이 열림. 데이터원본 팔레트(`style-rule/encoding@type='palette'`)가
+  버려져 색이 기본 색으로 나오고, 저장하면 항목이 사라진다
+- **조건**: `encoding@field`(파생 모양 `[usr:X:nk]` 등)가 같은 데이터원본 직속
+  `<column-instance>`로 선언돼 있지 않다 (워크시트 `<datasource-dependencies>` 선언은 대신하지 못한다)
+- **원천**: 2026-10-13 MA_028 SEC01·SEC03 `twb-recipe_버그리포트.md` (05 F5-q)
+- **린터(수정 전)**: `findings=0 · passed=true` — **AC3 위반의 다섯 번째 실증**
+- **심각도 — WARNING.** 상관 3626 : 3(반례는 합성 ID 한 파일), 인과는 *직속 인스턴스 + 팔레트
+  항목*을 함께 바꿔 확인돼 단독 효과가 분리되지 않았다. 파일은 열린다 → 층 2 (S1-6)
+
+### 제보가 제안했으나 **규칙으로 만들지 않은 것**
+
+| 제안 | 실측 | 결정 |
+|---|---|---|
+| `alias.instance_declared` — `[:Measure Names]` 별칭 키 직속 선언 | 21,375 : **1,529 미선언** | 폐기 — 낡은 별칭 키가 남는다 |
+| `palette.derivation_role` — `usr:` 키 `column`이 `dimension`이면 경고 | `measure` 2002 : `dimension` **41** | 폐기 — 정상본에 반례 41건 |
+
+주입 레시피 R36 추가.

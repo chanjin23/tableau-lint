@@ -41,6 +41,24 @@ def load_all() -> dict[str, str]:
     }
 
 
+def get(ref: str) -> tuple[str, str] | None:
+    """레시피 식별자로 정확히 찾는다 — 파일명(`18-datasource-folders-palette.md`),
+    확장자 뺀 이름, 번호(`18`) 중 무엇이든. 못 찾으면 None.
+
+    키워드 검색(`find`)과 달리 **추측하지 않는다** — 식별자가 모호하면 None이다.
+    """
+    token = ref.strip().lower().removesuffix(".md")
+    if not token:
+        return None
+    loaded = load_all()
+    for name, content in loaded.items():
+        stem = name.removesuffix(".md").lower()
+        number = stem.split("-", 1)[0].lstrip("0")
+        if token == stem or (token.isdigit() and number == token.lstrip("0")):
+            return name, content
+    return None
+
+
 def find(query: str) -> tuple[str, str] | None:
     """질의어와 가장 잘 맞는 레시피 (파일명, 본문). 아무 항도 안 맞으면 None.
 

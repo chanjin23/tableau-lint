@@ -552,6 +552,33 @@ def _r34_empty_worksheets(root: Any) -> str | None:
     return None
 
 
+def _r36_drop_palette_instance(root: Any) -> str | None:
+    """R36 — 팔레트 키의 데이터 원본 직속 `<column-instance>`를 지운다.
+
+    팔레트(`style-rule/encoding@type='palette'`)는 그대로 두고 키 인스턴스 선언만 뺀다.
+    파일은 열리지만 Tableau가 팔레트를 버려 색이 기본 색으로 나온다 (05 F5-q).
+    워크시트의 `<datasource-dependencies>` 사본은 건드리지 않는다 — 그쪽 선언이
+    남아 있어도 증상이 같다는 것이 제보 파일의 모양이었다.
+    """
+    removed: list[str] = []
+    datasources = root.find("datasources")
+    if datasources is None:
+        return None
+    for ds in datasources.findall("datasource"):
+        keys = {
+            enc.get("field")
+            for enc in ds.findall("style/style-rule/encoding")
+            if enc.get("type") == "palette"
+        }
+        for ci in ds.findall("column-instance"):
+            if ci.get("name") in keys:
+                ds.remove(ci)
+                removed.append(ci.get("name") or "")
+    if not removed:
+        return None
+    return f"팔레트 키 인스턴스 {len(removed)}개 삭제 ({removed[0]} 등)"
+
+
 def _r35_drop_accessible_zone_taborder(root: Any) -> str | None:
     """R35 — `AccessibleZoneTabOrder` 삭제. `dashboard@enable-sort-zone-taborder`는 남긴다.
 
@@ -748,6 +775,13 @@ RECIPES: tuple[Recipe, ...] = (
         ),
         source="docs/05-xsd-spike.md F5-p (2026-09-21 실패03 실측)",
         mutate=_r35_drop_accessible_zone_taborder,
+    ),
+    Recipe(
+        id="R36-drop-palette-instance",
+        rule="palette.instance_declared",
+        expected="열림 — 데이터 원본 팔레트가 버려져 색이 기본 색으로 나온다 (경고 대화상자 없음)",
+        source="docs/05-xsd-spike.md F5-q (2026-10-13 MA_028 제보)",
+        mutate=_r36_drop_palette_instance,
     ),
 )
 

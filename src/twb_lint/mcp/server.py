@@ -109,8 +109,11 @@ def twb_recipe(query: str = "") -> dict[str, Any]:
     레시피 없이 XML을 추측으로 쓰지 않는다. 매핑표에 없는 작업은 지어내지 말고
     미관찰로 보고한다.
 
+    인자는 `query` **하나뿐**이다 (다른 이름은 오류로 거부된다).
     query 없음 → 전체 매핑표(작업 → 레시피 인덱스).
-    query 있음(예: '계산 필드 추가') → 가장 맞는 레시피 본문.
+    query가 레시피 식별자(예: '18', '18-datasource-folders-palette', 파일명 `.md`)
+    → 그 레시피 본문.
+    query가 그 밖의 말(예: '계산 필드 추가') → 키워드로 가장 맞는 레시피 본문.
     """
     index = recipes.load_index()
     if index is None:
@@ -121,7 +124,7 @@ def twb_recipe(query: str = "") -> dict[str, Any]:
         }
     if not query.strip():
         return {"found": True, "index": index, "recipes": sorted(recipes.load_all())}
-    hit = recipes.find(query)
+    hit = recipes.get(query) or recipes.find(query)
     if hit is None:
         return {
             "found": False,
@@ -130,6 +133,22 @@ def twb_recipe(query: str = "") -> dict[str, Any]:
         }
     name, content = hit
     return {"found": True, "name": name, "content": content}
+
+
+def _reject_unknown_arguments() -> None:
+    """도구 호출의 **모르는 인자를 오류로 돌려준다.**
+
+    FastMCP가 만드는 인자 모델은 기본이 `extra='ignore'`라서 `twb_recipe(name='18')`처럼
+    틀린 인자 이름이 **조용히 버려지고** 인자 없는 호출로 처리된다 — 호출자는 인덱스를
+    받고도 왜 본문이 안 오는지 알 수 없다 (2026-10-13 MA_028 제보).
+    """
+    for tool in mcp._tool_manager.list_tools():
+        model = tool.fn_metadata.arg_model
+        model.model_config["extra"] = "forbid"
+        model.model_rebuild(force=True)
+
+
+_reject_unknown_arguments()
 
 
 def main() -> None:

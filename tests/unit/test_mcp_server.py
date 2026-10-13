@@ -96,3 +96,32 @@ def test_recipe_miss_says_so_instead_of_guessing() -> None:
 
     assert result["found"] is False
     assert "index" in result
+
+
+@pytest.mark.parametrize(
+    "ref", ["18", "018", "18-datasource-folders-palette", "18-datasource-folders-palette.md"]
+)
+def test_recipe_query_accepts_an_identifier(ref: str) -> None:
+    """식별자(번호·파일명)로 본문을 받는다 — 제보자가 `name='18-…md'`로 시도해 인덱스만 받았다."""
+    result = server.twb_recipe(ref)
+
+    assert result["found"] is True
+    assert result["name"] == "18-datasource-folders-palette.md"
+
+
+def test_recipe_identifier_does_not_swallow_a_keyword_query() -> None:
+    """식별자 판정이 키워드 검색을 가로채면 안 된다 — 일반 문구는 그대로 검색한다."""
+    result = server.twb_recipe("계산 필드 추가")
+
+    assert result["name"] == "01-calc-field-create.md"
+
+
+@pytest.mark.parametrize("tool", ["twb_recipe", "twb_validate", "twb_inspect", "twb_unpack"])
+def test_unknown_argument_is_an_error_not_silently_dropped(tool: str) -> None:
+    """틀린 인자 이름이 조용히 버려지면 호출자가 원인을 알 수 없다 (2026-10-13 제보)."""
+    import asyncio
+
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    with pytest.raises(ToolError, match="Extra inputs are not permitted"):
+        asyncio.run(server.mcp.call_tool(tool, {"no_such_argument": "x"}))

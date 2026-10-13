@@ -27,6 +27,10 @@
 
 ```xml
 <datasource>
+  <column … name='[Calculation_7200000000000003]' role='dimension' type='nominal' />
+  <column-instance column='[Calculation_7200000000000003]' derivation='None'
+                   name='[none:Calculation_7200000000000003:nk]' pivot='key' type='nominal' />
+  <layout … />
   <style>
     <style-rule element='mark'>
       <encoding attr='color' field='[none:Calculation_7200000000000003:nk]' type='palette'>
@@ -41,6 +45,23 @@
 - 값→색 매핑은 여기 한 곳. 시트들은 인코딩 참조만 하고 **상속**받는다 (레시피 10·13)
 - 색 변경 = `map@to`만 교체 (`b6256cf` 6건)
 - 필드별 `encoding` 블록 추가로 새 필드 팔레트 정의 (`b67ed82` 상수 차원 검정)
+
+### ⚠️ 팔레트 키 인스턴스는 **데이터소스 직속에도** 선언한다 (2026-10-13 MA_028 제보 · 05 F5-q)
+
+- `encoding@field`가 가리키는 `[파생:필드:접미]`는 **데이터소스 직속 `<column-instance>`**로
+  선언돼 있어야 한다 (위치: `<column>` 목록 뒤, `<layout>`·`<folders-common>` 앞).
+  **워크시트의 `<datasource-dependencies>` 안 선언만으로는 부족하다** — 직속 선언이 없으면
+  Tableau가 팔레트를 **통째로 버린다**: 오류 대화상자 없이 색이 기본 색으로 나오고,
+  저장하면 항목이 사라진다. 린트 규칙 ⑲(`palette.instance_declared`)이 WARNING으로 말한다
+- 실측: 파생 모양 팔레트 키 3629건 중 **3626건**이 직속 선언을 갖는다 (반례 3건은 한 파일의
+  합성 ID — 직속 `column-instance`가 0개인 저작물이다)
+- 인과 한계: 제보자가 *직속 인스턴스 추가 + 팔레트 항목 추가*를 한꺼번에 바꿔 색이 적용됐다.
+  "직속 인스턴스 하나로 충분했는가"는 분리되지 않았다
+- **규칙으로 만들지 않은 두 가지** (같은 제보가 제안했으나 실측이 반례를 냈다):
+  - `usr:` 키의 `column@role='measure'` — `measure` 2002 : `dimension` **41**. 정상본에 반례가 있다
+  - `[:Measure Names]` 별칭 키의 직속 인스턴스 — 22,904건 중 1,529건 미선언(낡은 별칭 키가 남는다)
+- 직속 `column-instance`를 워크시트 사용분의 **합집합**으로 채워야 하는지는 미확정이다
+  (정본 MA_008은 합집합 모양). 팔레트 키는 최소한 넣는다
 
 ## 재저장 검증
 
