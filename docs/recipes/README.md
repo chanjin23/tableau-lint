@@ -16,6 +16,8 @@
 | 선반에서 즉석 수식(임시 계산) | [05](./05-calc-adhoc.md) |
 | 매개변수 만들기 (목록) | [02](./02-parameter-create-list.md) |
 | 매개변수 타입 바꾸기 · 지우기 | [06](./06-parameter-lifecycle.md) |
+| **매개변수 표시 이름(alias) · 값으로 유형(구분값) 전환** — 등급 `추정` | [25](./25-parameter-display-alias.md) |
+| **값에 따라 컨테이너·시트·컨트롤 보이기/숨기기 (동적 존 표시, datagraph)** — 등급 `추정` | [26](./26-dashboard-zone-visibility.md) |
 | 클릭으로 매개변수 바꾸는 동작 | [07](./07-action-parameter.md) |
 | 클릭 하이라이트 동작 | [08](./08-action-highlight.md) |
 | 워크시트 만들기 · 복제 · 개명 · 삭제 | [09](./09-worksheet-lifecycle.md) |

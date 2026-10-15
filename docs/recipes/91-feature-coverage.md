@@ -34,6 +34,8 @@
 | `datasource/connection`·`relation`·`object-graph`·`metadata-record` | 92 | 21 · 17 |
 | `column`·`calculation`·`column-instance`·`table-calc` | 93 | 01 · 04 · 05 |
 | `column/members`·매개변수 | 80 | 02 · 06 |
+| `members/member@alias` · `column/aliases` (표시 이름 목록 매개변수) | 2묶음 (MA_002·MA_015) | 25 (`추정` — 결과형만, 관찰 O1~O5 대기) |
+| `datagraph` · `single-value-field-node` · `dashboard-zone-visibility-node` · `zone@hidden-by-user` (동적 존 표시) | 고유 60종 · 존 노드 332 | 26 (`추정` — 결과형만, 관찰 V1~V6 대기) |
 | `worksheet`·`window`·`thumbnail` 3곳 | 92 | 09 · 22 |
 | `table/cols`·`rows`·`panes/pane`·`view/breakdown` | 92 | 11 · 22 |
 | `filter`·`groupfilter`·`slices` | 86 | 12 |
