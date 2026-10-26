@@ -34,7 +34,7 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 408 passed, 14 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 432 passed, 14 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
 .venv/Scripts/python -m mypy             # 2026-09-21 현재 기존 오류 9건 — 게이트 아님
 ```

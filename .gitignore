@@ -23,3 +23,6 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# 레시피 건의함 (twb_recipe_request가 쓴다 — 로컬 전용)
+.twb-lint/

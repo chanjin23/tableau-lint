@@ -1,6 +1,7 @@
 """twb-lint MCP 서버 (stdio) — 공식 mcp[cli] FastMCP.
 
-도구 4개를 코어에 얇게 위임한다: twb_unpack · twb_inspect · twb_validate · twb_recipe.
+도구 5개를 코어에 얇게 위임한다: twb_unpack · twb_inspect · twb_validate · twb_recipe ·
+twb_recipe_request. 앞 넷은 읽기 전용이고 마지막만 건의함(.twb-lint/)에 쓴다.
 코어 로직은 여기 두지 않는다 (호스트 독립 유지).
 """
 
@@ -11,8 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
-from twb_lint import __version__, config, recipes
+from twb_lint import __version__, config, recipe_requests, recipes
 from twb_lint import inspect as inspector
 from twb_lint.io import twbx
 from twb_lint.validation import engine
@@ -24,7 +26,9 @@ mcp = FastMCP(
         "- `.twbx`를 다룰 때는 항상 twb_unpack으로 먼저 푼다.\n"
         "- 조회·질문만이면 twb_inspect만 쓴다 — twb_recipe·twb_validate를 부르지 않는다.\n"
         "- 생성·편집이면 XML을 쓰기 전에 twb_recipe를 조회하고, 작업 마지막에\n"
-        "  twb_validate로 검증한다. passed=False면 산출물을 내보내지 않는다."
+        "  twb_validate로 검증한다. passed=False면 산출물을 내보내지 않는다.\n"
+        "- twb_recipe가 found=False이거나 레시피대로 썼는데 검증이 실패하면 twb_recipe_request로\n"
+        "  접수한다. 접수는 레시피가 아니다 — 그래도 XML을 추측으로 쓰지 않는다."
     ),
 )
 
@@ -128,11 +132,39 @@ def twb_recipe(query: str = "") -> dict[str, Any]:
     if hit is None:
         return {
             "found": False,
-            "message": f"'{query}'에 맞는 레시피가 없다 — 미관찰 작업이면 지어내지 말 것.",
+            "message": f"'{query}'에 맞는 레시피가 없다 — 미관찰 작업이면 지어내지 말 것. "
+            "필요한 작업이면 twb_recipe_request(kind='missing')로 접수하라.",
             "index": index,
         }
     name, content = hit
     return {"found": True, "name": name, "content": content}
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False))
+def twb_recipe_request(
+    kind: str,
+    task: str,
+    recipe: str = "",
+    rule_ids: list[str] | None = None,
+    note: str = "",
+) -> dict[str, Any]:
+    """없거나 틀린 레시피를 **건의함에 접수**한다 (나중에 빈도순으로 모아 본다).
+
+    레시피를 만들거나 고치지는 않는다 — 부족한 목록을 남길 뿐이다. 접수한 뒤에도 XML을
+    추측으로 쓰지 않는다.
+
+    kind='missing': twb_recipe가 found=False였다. task에 하려던 작업을 한 줄로.
+    kind='defective': 레시피대로 썼는데 twb_validate가 실패했다. recipe에 따른
+    레시피(번호·파일명), rule_ids에 finding의 rule_id를 넣는다.
+
+    워크북 XML·데이터 값은 넣지 않는다 (XML 조각은 거부된다). 같은 요청은 합쳐져
+    count가 오른다.
+    """
+    try:
+        req = recipe_requests.submit(kind, task, recipe=recipe, rule_ids=rule_ids, note=note)
+    except recipe_requests.RequestError as exc:
+        return {"accepted": False, "message": str(exc)}
+    return {"accepted": True, "id": req.id, "count": req.count}
 
 
 def _reject_unknown_arguments() -> None:
