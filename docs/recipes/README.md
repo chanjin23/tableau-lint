@@ -34,6 +34,7 @@
 | 사용자 지정 SQL · 추출 켜고 끄기 | [17](./17-datasource-sql-extract.md) |
 | 필드 폴더 · 색상 팔레트 | [18](./18-datasource-folders-palette.md) |
 | 글꼴 · 서식 규칙 | [19](./19-format-fonts.md) |
+| **NULL 셀에 글자(N/A) 붙이기 · 0 구간 글자(DIV)는 `*` 접두어 · 숫자 서식 조건 구간이 안 먹는다는 부정 결과** — 등급 `관찰(1)` | [27](./27-null-alternate-text.md) |
 
 ## 전 레시피 공통 원칙
 
