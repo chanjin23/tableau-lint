@@ -26,6 +26,10 @@ MA_003 매출표의 `C_L_전체`(`"전체"`)·`C_L_세부현황`은 체인 전�
 
 **WARNING이다** (02 S1-6). 파일은 열린다.
 
+**워크시트에 등재된 `usr:`만 본다** (2026-11-10, ⑧-b와 같은 판단). 계산을 복사하면
+데이터소스에 `usr:` 인스턴스가 남는데, 그리는 시트가 없으니 증상도 없다 — MA_011 JWP
+`C_실적누적값(복사본)`에서 거짓양성이 났고 소유자가 사용 시트의 정상 렌더링을 확인했다.
+
 ⚠️ **모르면 침묵한다.** 참조를 펼치지 못했으면(외부 필드·미지 표기) 그 계산은 판정하지
 않고 건너뛴 사실을 `note_partial`로 보고한다. 집계 함수 목록이 불완전하면 거짓양성이
 나는 구조라, 판정 불가를 위반으로 읽지 않는다.
@@ -439,16 +443,24 @@ def _formulas_by_name(root: Any) -> dict[str, str]:
 
 
 def _user_aggregations(root: Any) -> list[tuple[Any, str]]:
-    """`derivation="User"` 인스턴스 → (요소, 대상 계산 이름). 이름당 첫 자리만."""
+    """**워크시트에 등재된** `derivation="User"` 인스턴스 → (요소, 대상 계산 이름).
+
+    ⑧-b의 `_view_aggregate_instances`와 같은 판단이다 — 데이터소스에만 남은 인스턴스는
+    어느 시트도 그리지 않으니 증상이 없다. 실측(2026-11-10): MA_011 JWP의
+    `C_실적누적값(복사본)`(`"당월"`/`"이전월"`)이 데이터소스에 `usr:` 잔재를 남겼고 유일한
+    사용 시트는 `none:`으로 쓴다 — 소유자가 그 시트의 정상 렌더링을 확인했다.
+    이름당 첫 자리만 보고한다.
+    """
     seen: set[str] = set()
     out: list[tuple[Any, str]] = []
-    for ci in root.iter("column-instance"):
-        if ci.get("derivation") != "User":
-            continue
-        name = (ci.get("column") or "").strip("[]")
-        if name and name not in seen:
-            seen.add(name)
-            out.append((ci, name))
+    for worksheet in root.iter("worksheet"):
+        for ci in worksheet.iter("column-instance"):
+            if ci.get("derivation") != "User":
+                continue
+            name = (ci.get("column") or "").strip("[]")
+            if name and name not in seen:
+                seen.add(name)
+                out.append((ci, name))
     return out
 
 

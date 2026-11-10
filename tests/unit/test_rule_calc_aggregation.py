@@ -30,14 +30,22 @@ def ctx_for(tmp_path: Path, xml: str) -> Any:
     return ctx
 
 
-def _wb(*calcs: Calc, instance: str = "라벨") -> str:
-    """계산 몇 개 + 그중 하나를 `usr:` 인스턴스로 올린 워크북."""
+def _wb(*calcs: Calc, instance: str = "라벨", in_worksheet: bool = True) -> str:
+    """계산 몇 개 + 그중 하나를 워크시트에서 `usr:` 인스턴스로 올린 워크북."""
+    ci = (
+        f"<column-instance column='[{instance}]' derivation='User' "
+        f"name='[usr:{instance}:qk]' pivot='key' type='quantitative' />"
+    )
+    body = (
+        f"<worksheets><worksheet name='S'><table><view>"
+        f"<datasource-dependencies datasource='federated.abc'>{ci}"
+        f"</datasource-dependencies></view></table></worksheet></worksheets>"
+        if in_worksheet
+        else ci
+    )
     return make_twb(
         datasources=(Ds(name="federated.abc", columns=("매출",), calcs=calcs),),
-        extra_body=(
-            f"<column-instance column='[{instance}]' derivation='User' "
-            f"name='[usr:{instance}:qk]' pivot='key' type='quantitative' />"
-        ),
+        extra_body=body,
     )
 
 
@@ -89,6 +97,19 @@ def test_lod_alone_does_not_count_as_aggregation(
     findings = rule.check(ctx)
 
     assert [f.severity for f in findings] == [Severity.WARNING]
+
+
+def test_user_instance_left_only_in_the_datasource_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """어느 워크시트도 그리지 않는 `usr:` 잔재다 — 증상이 없다 (⑧-b와 같은 판단).
+
+    실측 2026-11-10 MA_011 JWP `C_실적누적값(복사본)`: 계산을 복사하며 남은 잔재였고,
+    그 계산을 쓰는 유일한 시트는 `none:`으로 정상 렌더링됐다 (소유자 확인).
+    """
+    ctx = ctx_for(tmp_path, _wb(Calc(name="라벨", formula='"전체"'), in_worksheet=False))
+
+    assert rule.check(ctx) == []
 
 
 def test_dimension_instances_are_not_judged(rule: CalcAggregationRule, tmp_path: Path) -> None:

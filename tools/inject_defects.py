@@ -233,10 +233,16 @@ def _r18_bare_parameter_ref(root: Any) -> str | None:
 
 
 def _r19_unwrap_user_aggregation(root: Any) -> str | None:
-    """R19 — `usr:` 인스턴스로 올린 계산에서 바깥 집계를 벗긴다 → 시트가 비어 나온다."""
+    """R19 — `usr:` 인스턴스로 올린 계산에서 바깥 집계를 벗긴다 → 시트가 비어 나온다.
+
+    대상은 **워크시트에 등재된** `usr:`만 — 데이터소스 잔재는 그리는 시트가 없어
+    증상이 없고 규칙 ⑧-a도 보지 않는다 (2026-11-10).
+    """
     targets = {
         (ci.get("column") or "").strip("[]")
-        for ci in root.iter()
+        for ws in root.iter()
+        if isinstance(ws.tag, str) and fcp.strip_prefix(ws.tag) == "worksheet"
+        for ci in ws.iter()
         if isinstance(ci.tag, str)
         and fcp.strip_prefix(ci.tag) == "column-instance"
         and ci.get("derivation") == "User"
