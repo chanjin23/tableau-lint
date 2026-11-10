@@ -125,13 +125,13 @@ Claude Code용 명령 세 가지로 작업합니다.
 커밋하기 전에 아래 두 가지는 꼭 통과해야 합니다.
 
 ```bash
-.venv/Scripts/python -m pytest -q       # 442 passed, 14 skipped
+.venv/Scripts/python -m pytest -q       # 445 passed, 14 skipped
 .venv/Scripts/python -m ruff check .    # All checks passed
 ```
 
 > ⚠️ 테스트에 쓰는 실제 워크북(골든셋)은 **저장소에 없습니다.** 회사 재무 데이터라서요.
 > 실파일 테스트까지 돌리려면 `TWB_LINT_GOLDEN_NORMAL` 환경변수에 경로를 걸어 주세요
-> (그러면 456 passed가 나옵니다).
+> (그러면 459 passed가 나옵니다).
 
 ---
 

@@ -62,19 +62,29 @@ def get(ref: str) -> tuple[str, str] | None:
 def find(query: str) -> tuple[str, str] | None:
     """질의어와 가장 잘 맞는 레시피 (파일명, 본문). 아무 항도 안 맞으면 None.
 
-    점수: 질의어 토큰이 제목 줄에 있으면 크게, 본문 등장 횟수만큼 작게.
+    순위: **질의어 토큰을 몇 종류 담았나**가 먼저, 그다음 점수(제목 줄에 있으면 크게,
+    본문 등장 횟수만큼 작게). 한 단어만 수십 번 나오는 레시피가 질의어를 다 담은
+    레시피를 이기지 않게 한다 — "상위 N 매개변수"가 매개변수 레시피(25)로 갔다.
     동점은 파일명 순으로 앞의 것 — 결정론 유지.
+
+    **한 글자 영숫자 토큰은 세지 않는다** (`Top N`의 `n`). 부분 문자열로 세기 때문에
+    `n`은 영어 단어마다 걸려 긴 레시피가 이긴다 — "상위 N"이 CSV 레시피(21)를 돌려줬다
+    (2026-11-10). 그런 토큰만 있는 질의는 그대로 쓴다.
     """
     terms = [t.lower() for t in query.split() if t.strip()]
     if not terms:
         return None
-    best: tuple[int, str, str] | None = None
-    for name, content in load_all().items():
+    meaningful = [t for t in terms if not (len(t) == 1 and t.isascii() and t.isalnum())]
+    terms = meaningful or terms
+    best: tuple[tuple[int, int], str, str] | None = None
+    for name, content in sorted(load_all().items()):
         lowered = content.lower()
         title = lowered.splitlines()[0] if lowered else ""
+        covered = sum(1 for t in set(terms) if t in lowered)
         score = sum(10 * title.count(t) + lowered.count(t) for t in terms)
-        if score > 0 and (best is None or score > best[0]):
-            best = (score, name, content)
+        rank = (covered, score)
+        if score > 0 and (best is None or rank > best[0]):
+            best = (rank, name, content)
     if best is None:
         return None
     return best[1], best[2]
