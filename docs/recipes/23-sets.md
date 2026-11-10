@@ -4,7 +4,7 @@
 |---|---|
 | 판정 표면 | T3 · T4 |
 | UI 경로 | 데이터 창에서 차원 우클릭 > **만들기 > 집합** / 만든 집합을 선반·마크에 드래그 |
-| 근거 | 2026-08-10 관찰 `관찰_06`·`07`·`08`·`09` (소유자 조작, UI · 통제 diff) |
+| 근거 | 2026-08-10 관찰 `관찰_06`·`07`·`08`·`09` (소유자 조작, UI · 통제 diff) · 2026-11-10 MA_014 TopN(②-b 매개변수 개수, 소유자 확인) |
 | Tableau | 2026.1.1 |
 
 **실파일 106개에 사용자 집합이 46개 있는데 뷰에 배치된 표본이 0건이었다.**
@@ -59,6 +59,50 @@
 | `units='records'` | 개수 기준 |
 | `expression='SUM([매출])'` | **집계 수식 문자열.** 필드 참조는 계산식 표기(`[매출]`) |
 | `direction='DESC'` | 정렬 방향 |
+
+### ②-b 상위 N의 개수를 매개변수로 (2026-11-10 소유자 확인)
+
+`집합 편집 > 상위 탭 > 필드 기준` 에서 개수 드롭다운에 숫자 대신 **매개변수**(`P_TOPN`)를
+고른다. 대시보드의 매개변수 컨트롤로 Top 10/20/30/50을 바꿔 가며 볼 수 있다.
+
+```xml
+<!-- 매개변수: 정수 목록 -->
+<column caption='P_TOPN' datatype='integer' name='[매개 변수 6]' param-domain-type='list'
+        role='measure' type='quantitative' value='30'>
+  <calculation class='tableau' formula='30' />
+  <members>
+    <member value='10' /> <member value='20' /> <member value='30' /> <member value='50' />
+  </members>
+</column>
+
+<!-- 집합: count 자리에 매개변수 참조 -->
+<group caption='S_TOP20_거래처' name='[S_TOP20_거래처]' name-style='unqualified'
+       user:ui-builder='filter-group'>
+  <groupfilter count='[Parameters].[매개 변수 6]' end='top' function='end' units='records'
+               user:ui-marker='end' user:ui-top-by-field='true'>
+    <groupfilter direction='DESC' expression='[Calculation_9014000000000303]' function='order'
+                 user:ui-marker='order'>
+      <groupfilter function='level-members' level='[accnt_dtl_gcode]'
+                   user:ui-enumeration='all' user:ui-marker='enumerate' />
+    </groupfilter>
+  </groupfilter>
+</group>
+```
+
+- **바뀌는 곳은 `count` 하나다.** 나머지 3중 중첩은 ②와 같다
+- `count`는 **`[Parameters].[<내부 이름>]`** — 표시 이름(`P_TOPN`)이 아니라 `name`이고,
+  따옴표로 감싸지 않는다
+- 매개변수는 **정수형**(`datatype='integer'`)이다. 목록(`list`)이면 컨트롤에서 고르기 쉽다
+- **동반 변경**: 이 집합을 쓰는 워크시트의 `<datasource-dependencies datasource='Parameters'>`에
+  그 매개변수가 들어간다. 시트의 어떤 계산도 `P_TOPN`을 직접 쓰지 않는데도 들어갔다 —
+  집합(을 쓰는 계산)을 거쳐 끌려온 것이다
+- 정렬 기준이 **이미 집계된 계산필드**(`C_RANK_VAL = SUM(…)`)면 `expression`은
+  `SUM(…)`으로 감싸지 않고 **계산 참조 그대로** 쓴다. UI에는 집계가 *"사용자 지정"*으로 보인다
+
+근거: MA_014 JWP TopN (Tableau 저장본 3개, 썸네일·`user:ui-*` 있음). 소유자가 확인했다 —
+컨트롤을 10→50으로 바꾸면 그리드의 거래처 줄 수가 바뀌고, 집합 편집 상위 탭의 개수 칸에
+`P_TOPN`이 선택돼 있다. `twb_validate` 통과 (이 기능 관련 finding 0).
+`end='bottom'`(하위 N)은 여전히 미관찰.
 
 ## ③ 집합을 행/열 선반에 (`관찰_08`) ★
 
