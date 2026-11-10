@@ -4,7 +4,7 @@
 |---|---|
 | 판정 표면 | T4 |
 | UI 경로 | 마크 카드 (유형·색상·텍스트·크기·레이블) · 도구 설명 |
-| 근거 | MA_008 `5916221` `a248ae3` `6958d25` `b13bc5a` `b6256cf` `8b136bb` `23690bc`(AI) `35911cd` |
+| 근거 | MA_008 `5916221` `a248ae3` `6958d25` `b13bc5a` `b6256cf` `8b136bb` `23690bc`(AI) `35911cd` · 2026-11-10 MA_011 "총계 포함" 분리 실험 A0~A2 |
 | Tableau | 2026.1 |
 
 ## 마크 유형 (`5916221`)
@@ -25,6 +25,38 @@ pane마다 따로다 — 마크 카드 분리 상태(레시피 11)면 pane별로
 
 - 인코딩에 올린 필드는 그 시트 `datasource-dependencies`에 column·column-instance 동반 추가
 - 색상 팔레트 자체는 **데이터소스 수준**에 있다 (레시피 18) — 시트에는 참조만
+
+## 연속형 색상 — 총합계 행까지 칠하려면 "총계 포함" ★ (2026-11-10 분리 실험)
+
+**증상**: 그리드에 연속형 색상(음수 빨강/양수 검정 등)을 걸고 행 총합계를 켜면,
+**총합계 행 숫자만 회색**으로 나온다. Tableau 기본값은 총계를 색상 범위에서 **뺀다.**
+
+UI: 색상 카드 > 색상 편집 > (고급) **`총계 포함`** 체크.
+
+```xml
+<!-- worksheet/table/style/style-rule[@element='mark'] -->
+<encoding attr='color' center='-0.0001' field='[federated.<ds-id>].[Multiple Values]'
+          include-totals='true' num-steps='2' type='custom-interpolated'>
+  <color-palette custom='true' name='' type='ordered-diverging'> … </color-palette>
+</encoding>
+```
+
+- 바뀌는 것은 **`include-totals='true'` 속성 하나**다. 끄면 속성 자체가 없다 (`'false'` 표본 0)
+- 속성은 알파벳 순서 자리(`field` 다음 · `num-steps` 앞)에 쓴다 — Tableau 저장본이 그렇다
+- **총합계 행 글자색 서식으로는 안 고쳐진다.** `cell`·`header` style-rule에
+  `<format attr='color' data-class='total' value='#000000'/>`를 넣어도 회색 그대로다 —
+  색상 인코딩이 글자색 서식보다 우선한다 (아래 실험 A2)
+
+분리 실험 (MA_011 JWP `SEC04_그리드`, 직전 백업에서 한 곳만 바꿈, 소유자가 Tableau에서 확인):
+
+| 실험본 | 바꾼 것 | 총합계 행 숫자 |
+|---|---|---|
+| A0 | 없음 (대조) | 회색 |
+| A1 | `include-totals='true'`만 | **정상** (음수 빨강·양수 검정) |
+| A2 | `cell`·`header`에 `color data-class='total'/'subtotal'` `#000000`만 | 회색 |
+
+코퍼스: 색상 encoding 11,254건 중 `include-totals` **2건**(MA_011 JWP·JWLH 최종본, 둘 다 Tableau 저장본).
+`interpolated`·`palette` 유형에서도 같은 속성인지는 미관찰.
 
 ## 마크 레이블·크기
 

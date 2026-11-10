@@ -28,6 +28,7 @@
 | **상위 N 집합의 개수를 매개변수로 (Top 10/20/30 전환)** | [23](./23-sets.md) ②-b |
 | **도구 설명 뷰 (viz in tooltip)** | [24](./24-viz-in-tooltip.md) |
 | 마크 유형 · 색/텍스트 인코딩 · 레이블 · 도구설명 | [13](./13-marks-encodings.md) |
+| **연속형 색상이 총합계 행에 안 먹는다 (회색) → "총계 포함"** | [13](./13-marks-encodings.md) |
 | 정렬 | [14](./14-sorts.md) |
 | 대시보드에 시트 놓기 | [03](./03-dashboard-place-worksheet.md) |
 | 존 여백·테두리·모서리·배경 | [15](./15-zone-style.md) |
