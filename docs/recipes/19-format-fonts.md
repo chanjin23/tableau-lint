@@ -4,7 +4,7 @@
 |---|---|
 | 판정 표면 | T4(서식) |
 | UI 경로 | 서식 메뉴 / 워크시트 기본 서식 |
-| 근거 | MA_008 `75da540`·`8950148`·`d13373e`(AI 수용) `c6bdf15` `a248ae3` `146f488` `9cac21f`(UI) |
+| 근거 | MA_008 `75da540`·`8950148`·`d13373e`(AI 수용) `c6bdf15` `a248ae3` `146f488` `9cac21f`(UI) · 2026-11-10 MA_018 총합계 글꼴(UI) |
 | Tableau | 2026.1 |
 
 ## 원리 — 기본값은 XML에 안 적힌다 (`75da540`)
@@ -60,6 +60,44 @@ Tableau 기본(Tableau Book 9pt)은 파일에 문자열로 존재하지 않는�
 > 규칙에 넣지 않았다. 건드릴 일이 있으면 그 파일의 기존 표기를 따른다.
 
 - 소계 테두리: `style-rule[@element='header']/format[@attr='border-color'][@data-class='subtotal']` (`9cac21f`)
+
+## 총계·총합계 행 글꼴 — `data-class` (2026-11-10 UI 관찰)
+
+UI: **서식 > 글꼴** → 서식 창 *시트* 탭에 `기본값` · **`총계`** · **`총합계`** 세 영역이 있고,
+각각 `패널`(숫자 셀)과 `머리글`(행 이름) 글꼴을 따로 고른다.
+본문 서식과 **같은 `style-rule`에 `data-class`만 붙인** 형태로 저장된다.
+
+| UI | XML |
+|---|---|
+| 총합계 > 패널 | `style-rule[@element='cell']/format[@data-class='total']` |
+| 총합계 > 머리글 | `style-rule[@element='header']/format[@data-class='total']` |
+| 총계 > 패널 · 머리글 | 같은 자리에 `data-class='subtotal'` (아래 근거 — 이름 대응은 추정) |
+
+```xml
+<style-rule element='cell'>
+  …본문 서식…
+  <format attr='color' data-class='total' value='#c0c0c0' />    <!-- 총합계 숫자 -->
+</style-rule>
+<style-rule element='header'>
+  …본문 서식…
+  <format attr='color' data-class='total' value='#b6992d' />    <!-- '총합계' 글자 -->
+</style-rule>
+```
+
+- **기본값이면 아무것도 안 적힌다** — 총계·총합계 행은 본문 글꼴을 그대로 따른다.
+  "총합계 행을 본문과 같게"는 **서식을 넣는 일이 아니라 빼는 일**이다 (`data-class` 서식 삭제)
+- 필드 서식 창(예: `측정값 이름` 우클릭 > 서식 > 머리글 탭 > 총합계)에서 바꾸면
+  `@field`가 붙는다: `<format attr='color' data-class='total' field='[<ds>].[:Measure Names]' … />`
+- `총계`↔`subtotal` 근거: MA_002 89개 파일의 `cell`·`header`
+  `font-weight data-class='subtotal' value='normal'` · 테두리 `subtotal` 30,337건. 직접 조작 관찰은 `총합계`뿐
+- 굵기·글꼴·크기도 본문과 같은 속성 이름(`font-weight`·`font-family`·`font-size`)에
+  `data-class`를 붙인다 — `font-weight`는 `subtotal`로 관찰, `total`의 글꼴·크기는 미관찰
+
+**⚠ 연속형 색상이 걸린 그리드에서 총합계 숫자가 회색이면 글꼴 문제가 아니다.**
+색상 인코딩이 이 글자색 서식을 이긴다 — `include-totals`(레시피 13 "총계 포함")로 고친다.
+
+근거: MA_018 JWP `SEC03_상세 실적표_그리드`(총합계 켜짐, 색상 인코딩 없음)에서 소유자가
+`총합계` 패널을 연회색, 머리글을 금색으로 바꿔 저장 → 위 두 줄만 추가됐다 (재저장 정규화 제외).
 
 ## 셀 숫자 서식 — `text-format` (`146f488` · MA_011 260811 재저장 무수정 수용)
 
