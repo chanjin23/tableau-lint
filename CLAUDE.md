@@ -34,13 +34,13 @@
 ## 검증 파이프라인 (코드 수정 시 필수)
 
 ```bash
-.venv/Scripts/python -m pytest -q        # 432 passed, 14 skipped (골든셋 미설정 시)
+.venv/Scripts/python -m pytest -q        # 442 passed, 14 skipped (골든셋 미설정 시)
 .venv/Scripts/python -m ruff check .     # All checks passed
-.venv/Scripts/python -m mypy             # 2026-09-21 현재 기존 오류 9건 — 게이트 아님
+.venv/Scripts/python -m mypy             # 2026-11-10 현재 기존 오류 12건 — 게이트 아님
 ```
 
 하나라도 깨지면 커밋하지 않는다. 규칙을 구현했으면 **실파일 회귀**까지 —
-골든셋 경로를 환경변수로 걸면 `422 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
+골든셋 경로를 환경변수로 걸면 `456 passed`가 된다 (AC8 xfail은 io 1단계 완료로 해제됐다).
 절차는 [`07-implementation-guide.md`](./docs/07-implementation-guide.md) §2.
 
 ```bash
@@ -49,8 +49,8 @@ export TWB_LINT_GOLDEN_NORMAL='<정상본 glob>;<glob>;...'   # ';' 구분, 미�
 
 > `uv`는 이 머신에서 실행이 차단된다(Smart App Control). 위 `.venv` 경로를 쓴다.
 > **`mypy`는 2026-09-21 기준 다시 실행된다** (2026-07-30~ 차단돼 있었다). 다만 그 사이
-> 쌓인 오류가 **9건**이라 아직 green이 아니다 — 정리 전까지 pytest·ruff만 게이트다.
-> 9건은 `tools/scan_surfaces.py`·`tools/inject_defects.py`·`shelf_refs.py`·테스트 4개에 있다.
+> 쌓인 오류가 **12건**(2026-11-10)이라 아직 green이 아니다 — 정리 전까지 pytest·ruff만 게이트다.
+> 12건은 `tools/scan_surfaces.py`·`tools/inject_defects.py`·`shelf_refs.py`·테스트 5개에 있다.
 
 ## 자주 트리는 것 (상세는 07)
 

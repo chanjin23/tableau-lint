@@ -307,3 +307,127 @@ def test_unresolvable_reference_is_not_a_violation(
 
     assert mixed_findings(rule, ctx) == []
     assert [n.status for n in ctx.notes_for(rule.id)] == [CoverageStatus.PARTIAL]
+
+
+# ⑧-d — 정렬 기준 계산에 ATTR이 있다 (2026-11-10 분리 실험 V1~V4, 건의함 425583f4)
+
+
+def _sort_wb(*calcs: Calc, using: str = "C_정렬", role: str = "usr", kind: str = "qk") -> str:
+    """차원 `X`를 `using`으로 정렬하는 워크시트 하나. `매출`·`거래처`는 원본 컬럼이다."""
+    base = (
+        Calc(name="X", formula='IF [거래처] = "" THEN "기타" ELSE [거래처] END'),
+        Calc(name="C_매출", formula="SUM([매출])"),
+    )
+    return make_twb(
+        datasources=(Ds(name="federated.abc", columns=("매출", "거래처"), calcs=base + calcs),),
+        extra_body=(
+            "<worksheets><worksheet name='S'><table><view>"
+            "<computed-sort column='[federated.abc].[none:X:nk]' direction='DESC' "
+            f"using='[federated.abc].[{role}:{using}:{kind}]' />"
+            "</view></table></worksheet></worksheets>"
+        ),
+    )
+
+
+def sort_findings(rule: CalcAggregationRule, ctx: Any) -> list[Any]:
+    return [f for f in rule.check(ctx) if "정렬 기준" in f.message]
+
+
+@pytest.mark.parametrize(
+    ("formula", "why"),
+    [
+        ('IF ATTR([X]) = "기타" THEN -999 ELSE [C_매출] END', "V1 — 정렬 대상 자신"),
+        ('IF ATTR([거래처]) = "" THEN -999 ELSE [C_매출] END', "V3·V4 — 대상이 아니어도"),
+    ],
+)
+def test_attr_in_sort_calculation_is_a_warning(
+    rule: CalcAggregationRule, tmp_path: Path, formula: str, why: str
+) -> None:
+    ctx = ctx_for(tmp_path, _sort_wb(Calc(name="C_정렬", formula=formula)))
+
+    findings = sort_findings(rule, ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING], why
+    assert "`X`" in findings[0].message and "C_정렬" in findings[0].message
+    assert findings[0].line is not None
+
+
+def test_attr_reached_through_a_reference_chain_is_a_warning(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    ctx = ctx_for(
+        tmp_path,
+        _sort_wb(
+            Calc(name="C_속성", formula="ATTR([거래처])"),
+            Calc(name="C_정렬", formula='IF [C_속성] = "" THEN -999 ELSE [C_매출] END'),
+        ),
+    )
+
+    assert len(sort_findings(rule, ctx)) == 1
+
+
+@pytest.mark.parametrize(
+    ("formula", "why"),
+    [
+        # 거짓양성 함정 — V2: ATTR만 MIN으로 바꾼 판은 정상 렌더링됐다
+        ('IF MIN([X]) = "기타" THEN -999 ELSE [C_매출] END', "V2 — 자기 참조라도 MIN은 정상"),
+        # LOD 안 ATTR은 실험하지 않았다 — 모르면 침묵
+        ('IF { FIXED [거래처] : ATTR([X]) } = "" THEN 0 ELSE 1 END', "LOD 안은 대상 밖"),
+        # 문자열 속 ATTR은 함수가 아니다
+        ('IF MIN([X]) = "ATTR(x)" THEN 0 ELSE 1 END', "문자열 리터럴"),
+    ],
+)
+def test_sort_calculation_without_attr_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path, formula: str, why: str
+) -> None:
+    ctx = ctx_for(tmp_path, _sort_wb(Calc(name="C_정렬", formula=formula)))
+
+    assert sort_findings(rule, ctx) == [], why
+
+
+def test_row_level_self_reference_with_min_derivation_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """코퍼스 정상 809건의 모양 — 행수준 계산이 정렬 대상 자신을 참조하고 `min:`으로 건다."""
+    ctx = ctx_for(
+        tmp_path,
+        _sort_wb(
+            Calc(name="C_정렬", formula='IF [X] = "기타" THEN 999 ELSE 1 END'),
+            role="min",
+            kind="nk",
+        ),
+    )
+
+    assert sort_findings(rule, ctx) == []
+
+
+def test_attr_outside_sorting_is_silent(rule: CalcAggregationRule, tmp_path: Path) -> None:
+    """`ATTR`은 흔하다(코퍼스 4,422개) — 정렬 기준으로 쓰일 때만 문제다."""
+    ctx = ctx_for(
+        tmp_path,
+        _sort_wb(
+            Calc(name="C_라벨", formula="ATTR([거래처])"),
+            Calc(name="C_정렬", formula="SUM([매출])"),
+        ),
+    )
+
+    assert sort_findings(rule, ctx) == []
+
+
+def test_sort_by_plain_column_is_not_judged(rule: CalcAggregationRule, tmp_path: Path) -> None:
+    ctx = ctx_for(tmp_path, _sort_wb(using="매출", role="sum", kind="qk"))
+
+    assert sort_findings(rule, ctx) == []
+
+
+def test_unresolvable_sort_chain_is_undecided_not_a_violation(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    ctx = ctx_for(
+        tmp_path,
+        _sort_wb(Calc(name="C_정렬", formula="MIN([어디에도_없는_필드])")),
+    )
+
+    assert sort_findings(rule, ctx) == []
+    notes = ctx.notes_for(rule.id)
+    assert any("C_정렬" in (n.reason or "") for n in notes)

@@ -579,6 +579,46 @@ def _r36_drop_palette_instance(root: Any) -> str | None:
     return f"팔레트 키 인스턴스 {len(removed)}개 삭제 ({removed[0]} 등)"
 
 
+def _r37_attr_in_sort_calc(root: Any) -> str | None:
+    """R37 — 정렬 기준 계산의 수식을 `ATTR([정렬 대상])` 비교로 바꾼다.
+
+    2026-11-10 분리 실험 V1의 모양이다 (05 F5-r). `ATTR`만 `MIN`으로 바꾼 V2는 정상
+    렌더링됐으므로 이 변형이 되돌리는 것은 정확히 그 한 함수다. `usr:` 정렬 기준을
+    우선 고른다 — `min:` 파생에 집계식을 넣으면 ⑧-b(이중 집계)도 함께 울어 귀속이 흐려진다.
+    수식 사본(데이터원본 정의 · 워크시트 의존성)은 전부 같이 바꾼다.
+    """
+    calcs: dict[str, list[Any]] = {}
+    for col in root.iter():
+        if not isinstance(col.tag, str) or fcp.strip_prefix(col.tag) != "column":
+            continue
+        calc = next(
+            (c for c in col if isinstance(c.tag, str) and fcp.strip_prefix(c.tag) == "calculation"),
+            None,
+        )
+        if calc is not None and calc.get("formula") is not None:
+            calcs.setdefault((col.get("name") or "").strip("[]"), []).append(calc)
+
+    candidates: list[tuple[bool, str, str]] = []  # (usr: 아님, 정렬 기준, 정렬 대상)
+    for el in root.iter():
+        if not isinstance(el.tag, str) or fcp.strip_prefix(el.tag) != "computed-sort":
+            continue
+        raw_using = el.get("using") or ""
+        using = fieldref.parse(raw_using)
+        target = fieldref.parse(el.get("column") or "")
+        if using is None or target is None:
+            continue
+        name = next((n for n in using.names if n in calcs), None)
+        if name is not None:
+            candidates.append((".[usr:" not in raw_using, name, target.names[0]))
+    if not candidates:
+        return None
+    _, name, target_name = min(candidates, key=lambda c: c[0])  # usr: 먼저, 같으면 문서 순서
+    formula = f'IF ATTR([{target_name}]) = "" THEN 0 ELSE 1 END'
+    for calc in calcs[name]:
+        calc.set("formula", formula)
+    return f"정렬 기준 `{name}` 수식 → {formula} (사본 {len(calcs[name])}개)"
+
+
 def _r35_drop_accessible_zone_taborder(root: Any) -> str | None:
     """R35 — `AccessibleZoneTabOrder` 삭제. `dashboard@enable-sort-zone-taborder`는 남긴다.
 
@@ -782,6 +822,13 @@ RECIPES: tuple[Recipe, ...] = (
         expected="열림 — 데이터 원본 팔레트가 버려져 색이 기본 색으로 나온다 (경고 대화상자 없음)",
         source="docs/05-xsd-spike.md F5-q (2026-10-13 MA_028 제보)",
         mutate=_r36_drop_palette_instance,
+    ),
+    Recipe(
+        id="R37-attr-in-sort-calc",
+        rule="calc.aggregation",
+        expected="열림 + 'X에 대한 정렬이 잘못되었습니다' → 정렬 대상이 빨간 알약 · 시트 빈 화면",
+        source="docs/05-xsd-spike.md F5-r (2026-11-10 MA_014 분리 실험 V1~V4)",
+        mutate=_r37_attr_in_sort_calc,
     ),
 )
 

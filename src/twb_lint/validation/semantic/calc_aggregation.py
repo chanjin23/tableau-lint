@@ -81,6 +81,35 @@ LOD 중괄호 안도 마찬가지다(`{FIXED [a] : SUM([b])} + [c]`는 정상) �
 
 ⚠️ **모르면 침묵한다**는 ⑧-a와 같다. 맨 참조를 끝까지 펼치지 못하면 위반이 아니라
 `note_partial`이다. 매개변수는 상수라 어느 쪽에도 걸지 않는다.
+
+## ⑧-d — 정렬 기준 계산에 `ATTR`이 있다 (2026-11-10)
+
+`computed-sort@using`이 가리키는 계산의 참조 체인 어디에든 `ATTR(…)`이 있으면 Tableau가
+정렬을 거부한다. 정렬 **대상** 필드가 오류 상태가 되고(빨간 알약) 시트가 **빈 화면**이 된다:
+
+    'C_LV1_TOP20'에 대한 정렬이 잘못되었습니다.   (InvalidField)
+
+같은 수식에서 `ATTR`만 `MIN`으로 바꾸면 정상 렌더링된다. **자기 참조는 원인이 아니다** —
+처음엔 *"정렬 계산이 정렬 대상 자신을 참조했다"*로 접수됐지만(건의함 `425583f4`), 코퍼스에서
+행수준 정렬 계산이 대상 자신을 참조하는 정상 사례가 809건 나왔다.
+
+분리 실험 (MA_014 JWP Top20 정상판, 정렬 계산 수식 한 곳만 교체, 소유자가 Tableau에서 확인):
+
+| 판 | 정렬 계산 | 결과 |
+|---|---|---|
+| V1 | `IF ATTR([정렬 대상]) = "기타" …` | 빨간 알약 · 빈 화면 |
+| V2 | `IF MIN([정렬 대상]) = "기타" …` | **정상** (대조군 — 직렬화 경로 동일) |
+| V3 | `IF ATTR([정렬 대상의 입력]) = "" …` | 빨간 알약 · 빈 화면 |
+| V4 | `IF ATTR([무관한 원본 필드]) = "" …` | 빨간 알약 · 빈 화면 |
+
+코퍼스 (2026-11-10, `C:/dev/JW/**` 해시 중복 제거 1,469개): 정렬 기준이 계산인
+`computed-sort` **2,776건 중 체인에 `ATTR`이 있는 것 0건** — `ATTR`을 담은 계산이 954개 파일에
+4,422개 있는데도 그렇다. `ATTR`이 드물어서 0인 것이 아니다.
+
+**LOD 중괄호 안의 `ATTR`은 보지 않는다** — 실험이 그 자리를 건드리지 않았다. 원본 필드에
+`attr:` 파생을 건 정렬 기준도 표본이 0이라 보지 않는다 (관측된 파생은 `min:`·`sum:`·`usr:`).
+
+**WARNING이다** (02 S1-6) — 파일은 열린다. 층 4(필드 오류 상태)다.
 """
 
 from __future__ import annotations
@@ -164,6 +193,7 @@ class CalcAggregationRule(RuleBase):
         out = self._missing_aggregate(ctx, formulas, known, undecided)
         out += self._double_aggregate(ctx, formulas, known, undecided)
         out += self._mixed_levels(ctx, formulas, known, undecided)
+        out += self._attr_in_sort(ctx, formulas, known, undecided)
 
         if undecided:
             # 판정 못 한 것을 조용히 넘기면 "전부 검사했다"로 읽힌다 (02 S5).
@@ -293,6 +323,108 @@ class CalcAggregationRule(RuleBase):
                 )
             )
         return out
+
+    def _attr_in_sort(
+        self,
+        ctx: ValidationContext,
+        formulas: dict[str, str],
+        known: set[str],
+        undecided: list[str],
+    ) -> list[Finding]:
+        """⑧-d — 정렬 기준(`computed-sort@using`) 계산의 체인에 `ATTR`이 있다."""
+        out: list[Finding] = []
+        root = ctx.raw_tree
+        if root is None:
+            return out  # check()가 이미 걸렀다 — 타입 좁히기용
+        captions = _captions(root)
+        for el in root.iter("computed-sort"):
+            using = fieldref.parse(el.get("using") or "")
+            if using is None or using.special is not None:
+                continue
+            name = next((n for n in using.names if n in formulas), None)
+            if name is None:
+                continue  # 원본 컬럼 정렬 — 계산이 아니다
+            verdict = _chain_has_attr(name, formulas, known)
+            if verdict is None:
+                undecided.append(name)
+                continue
+            if not verdict:
+                continue
+            target = fieldref.parse(el.get("column") or "")
+            target_name = target.names[0] if target is not None else (el.get("column") or "?")
+            # Tableau 오류 문구는 caption을 쓴다 — 사용자가 화면에서 보는 이름으로 맞춘다
+            shown = captions.get(target_name, target_name)
+            sorter = captions.get(name, name)
+            out.append(
+                Finding(
+                    severity=Severity.WARNING,
+                    rule_id=self.id,
+                    location=_path_of(el),
+                    line=el.sourceline,
+                    message=(
+                        f"`{shown}`의 정렬 기준 `{sorter}`의 수식(참조 체인 포함)에 "
+                        "`ATTR`이 있다 — "
+                        f"Tableau가 *'{shown}에 대한 정렬이 잘못되었습니다'*로 정렬을 거부하고, "
+                        "그 필드가 **빨간 알약**이 되며 시트가 **빈 화면**이 된다"
+                    ),
+                    fix=(
+                        "정렬 계산의 `ATTR(…)`을 `MIN(…)`·`MAX(…)`로 바꾼다 (실측: 같은 수식에서 "
+                        "`ATTR`→`MIN`만 바꾸면 정상 렌더링). 집합 소속으로 가르려면 집합을 "
+                        "직접 참조한다 (`MAX(IF [집합] THEN 1 ELSE 0 END)`)."
+                    ),
+                )
+            )
+        return out
+
+
+def _chain_has_attr(
+    name: str,
+    formulas: dict[str, str],
+    known: set[str],
+    depth: int = 0,
+    seen: set[str] | None = None,
+) -> bool | None:
+    """참조 체인 어디에든 `ATTR`(LOD 밖)이 있는가. `None`이면 **판정 불가**.
+
+    `_chain_has_aggregate`와 같은 안전장치다 — 찾으면 확실하지만, 못 찾았는데 펼치지
+    못한 참조가 있으면 "없다"가 아니라 "모른다"다.
+    """
+    seen = seen if seen is not None else set()
+    if name in seen:
+        return False
+    if depth >= MAX_DEPTH:
+        return None
+    seen.add(name)
+
+    formula = formulas.get(name)
+    if formula is None:
+        return None
+    if "ATTR" in extract(_strip_lod(formula)).functions:
+        return True
+
+    unresolved = False
+    for raw in sorted(extract(formula).field_refs):
+        ref = _last_name(raw)
+        if ref in formulas:
+            nested = _chain_has_attr(ref, formulas, known, depth + 1, seen)
+            if nested:
+                return True
+            if nested is None:
+                unresolved = True
+        elif ref not in known:
+            unresolved = True
+    return None if unresolved else False
+
+
+def _captions(root: Any) -> dict[str, str]:
+    """필드 내부 이름 → caption. caption이 없는 필드는 담지 않는다."""
+    out: dict[str, str] = {}
+    for col in root.iter("column"):
+        name = (col.get("name") or "").strip("[]")
+        caption = col.get("caption")
+        if name and caption:
+            out.setdefault(name, caption)
+    return out
 
 
 def _formulas_by_name(root: Any) -> dict[str, str]:
