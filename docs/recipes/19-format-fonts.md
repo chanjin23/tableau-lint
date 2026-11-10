@@ -86,8 +86,8 @@ UI: **서식 > 글꼴** → 서식 창 *시트* 탭에 `기본값` · **`총계`
 
 - **기본값이면 아무것도 안 적힌다** — 총계·총합계 행은 본문 글꼴을 그대로 따른다.
   "총합계 행을 본문과 같게"는 **서식을 넣는 일이 아니라 빼는 일**이다 (`data-class` 서식 삭제)
-- 필드 서식 창(예: `측정값 이름` 우클릭 > 서식 > 머리글 탭 > 총합계)에서 바꾸면
-  `@field`가 붙는다: `<format attr='color' data-class='total' field='[<ds>].[:Measure Names]' … />`
+- 필드 한정 형태도 1건 나왔다: `<format attr='color' data-class='total' field='[<ds>].[:Measure Names]' … />`
+  — 같은 관찰 중 **실수 클릭**으로 생긴 것이라 UI 경로는 미확인 (필드 서식 창으로 추정)
 - `총계`↔`subtotal` 근거: MA_002 89개 파일의 `cell`·`header`
   `font-weight data-class='subtotal' value='normal'` · 테두리 `subtotal` 30,337건. 직접 조작 관찰은 `총합계`뿐
 - 굵기·글꼴·크기도 본문과 같은 속성 이름(`font-weight`·`font-family`·`font-size`)에
