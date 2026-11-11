@@ -86,6 +86,11 @@ LOD 중괄호 안도 마찬가지다(`{FIXED [a] : SUM([b])} + [c]`는 정상) �
 ⚠️ **모르면 침묵한다**는 ⑧-a와 같다. 맨 참조를 끝까지 펼치지 못하면 위반이 아니라
 `note_partial`이다. 매개변수는 상수라 어느 쪽에도 걸지 않는다.
 
+**매개변수만으로 만든 계산도 상수다** (2026-11-11). `C_IS_QTD = [Parameters].[매개 변수 3]
+% 3 = 0`을 `IF [C_IS_QTD] THEN 집계/집계 …`의 조건으로 쓴 MA_004 그리드 계열에서 136건
+거짓양성이 났다 — 소유자가 Tableau에서 그 계산에 오류 표시가 없음을 확인했다. 체인 끝이
+매개변수·리터럴뿐이면 행수준으로 세지 않는다. 원본 컬럼에 하나라도 닿으면 그대로 행수준이다.
+
 ## ⑧-d — 정렬 기준 계산에 `ATTR`이 있다 (2026-11-10)
 
 `computed-sort@using`이 가리키는 계산의 참조 체인 어디에든 `ATTR(…)`이 있으면 Tableau가
@@ -655,7 +660,7 @@ def _confident_row_level(
             verdict = _chain_has_aggregate(name, formulas, known)
             if verdict is None:
                 undecided.append(name)
-            elif not verdict:
+            elif not verdict and not _chain_is_constant(name, formulas, params):
                 out.append(raw)
             continue
         if name in known:
@@ -663,6 +668,41 @@ def _confident_row_level(
         else:
             undecided.append(name)
     return out
+
+
+def _chain_is_constant(
+    name: str,
+    formulas: dict[str, str],
+    params: set[str],
+    depth: int = 0,
+    seen: set[str] | None = None,
+) -> bool:
+    """참조 체인 끝이 **매개변수·리터럴뿐**인가 — 원본 컬럼에 하나도 닿지 않는가.
+
+    그런 계산은 상수라 집계와 섞어도 된다. 매개변수를 수식에서 직접 쓰면 이미 건너뛰는데
+    (`_confident_row_level`), 매개변수만으로 만든 계산을 거치면 행수준으로 읽었다.
+    실측(2026-11-11): ⑧-c 136건이 전부 `C_IS_QTD = [Parameters].[매개 변수 3] % 3 = 0`을
+    `IF [C_IS_QTD] THEN 집계/집계 …`의 조건으로 쓴 MA_004 그리드 계열이었다.
+
+    모르면 `False`(상수라고 단정하지 않는다) — 그러면 예전 판정으로 돌아간다.
+    """
+    seen = seen if seen is not None else set()
+    if name in seen:
+        return True  # 순환 — 이 가지에서는 원본 컬럼을 못 만났다
+    if depth >= MAX_DEPTH:
+        return False
+    seen.add(name)
+    formula = formulas.get(name)
+    if formula is None:
+        return False
+    for raw in extract(formula).field_refs:
+        ref = _last_name(raw)
+        if ref in params:
+            continue
+        if ref in formulas and _chain_is_constant(ref, formulas, params, depth + 1, seen):
+            continue
+        return False  # 원본 컬럼이거나 모르는 참조
+    return True
 
 
 def _strip_lod(formula: str) -> str:

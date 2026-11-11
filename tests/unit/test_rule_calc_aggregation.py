@@ -341,11 +341,12 @@ def test_missing_tree_reports_the_skip(rule: CalcAggregationRule) -> None:
 # ⑧-c — 한 수식 안에서 집계와 행수준을 섞었다 (2026-09-14 실측, 05 F5-m)
 
 
-def _mix_wb(formula: str, *, with_param: bool = False) -> str:
+def _mix_wb(formula: str, *, with_param: bool = False, extra: tuple[Calc, ...] = ()) -> str:
     """`C_혼합` 하나만 든 워크북. `매출`·`수량`은 원본 컬럼(= 행수준 확정)이다."""
     sources = [Ds(name="federated.abc", columns=("매출", "수량"), calcs=(
         Calc(name="C_혼합", formula=formula),
         Calc(name="C_집계", formula="SUM([매출])"),
+        *extra,
     ))]
     if with_param:
         sources.append(Ds(name="Parameters", columns=("P_기준",)))
@@ -404,6 +405,36 @@ def test_parameters_are_not_row_level(rule: CalcAggregationRule, tmp_path: Path)
     ctx = ctx_for(tmp_path, _mix_wb("SUM([매출]) > [Parameters].[P_기준]", with_param=True))
 
     assert mixed_findings(rule, ctx) == []
+
+
+def test_calc_built_only_from_parameters_is_a_constant(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """매개변수만으로 만든 계산도 상수다 — 집계와 섞어도 된다.
+
+    실측 2026-11-11: ⑧-c 136건이 전부 `C_IS_QTD = [Parameters].[매개 변수 3] % 3 = 0`을
+    `IF [C_IS_QTD] THEN 집계/집계 …`의 조건으로 쓴 MA_004 그리드 계열이었다.
+    """
+    ctx = ctx_for(tmp_path, _mix_wb(
+        "IF [C_IS] THEN SUM([매출]) ELSE 0 END",
+        with_param=True,
+        extra=(Calc(name="C_IS", formula="[Parameters].[P_기준] % 3 = 0"),),
+    ))
+
+    assert mixed_findings(rule, ctx) == []
+
+
+def test_calc_mixing_parameter_and_column_is_still_row_level(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """함정 — 매개변수가 있어도 원본 컬럼에 닿으면 행수준이다. 그대로 잡는다."""
+    ctx = ctx_for(tmp_path, _mix_wb(
+        "IF [C_행] > 0 THEN SUM([매출]) ELSE 0 END",
+        with_param=True,
+        extra=(Calc(name="C_행", formula="[Parameters].[P_기준] + [수량]"),),
+    ))
+
+    assert [f.severity for f in mixed_findings(rule, ctx)] == [Severity.WARNING]
 
 
 def test_unresolvable_reference_is_not_a_violation(
