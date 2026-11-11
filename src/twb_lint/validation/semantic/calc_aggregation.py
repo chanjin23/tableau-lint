@@ -541,9 +541,35 @@ def _view_aggregate_instances(root: Any) -> list[tuple[Any, str, str]]:
             key = (_datasource_of(ci), name, derivation)
             if not name or key in seen:
                 continue
+            if not _drawn_in(worksheet, ci.get("name") or ""):
+                continue  # 선언만 남은 인스턴스 — 그리지 않으니 빨간 알약도 없다
             seen.add(key)
             out.append((ci, name, derivation))
     return out
+
+
+_NOT_DRAWN = frozenset({"datasource-dependencies", "manual-sort"})
+"""인스턴스가 나와도 **그리는 자리가 아닌** 부분트리.
+
+`datasource-dependencies`는 선언부다. `manual-sort`의 `<bucket>`은 측정값 순서 사전인데,
+필터에서 멤버를 빼도 옛 bucket이 남는다(레시피 14 — 무해). 실측(2026-11-11): ⑧-b 잔여
+20건이 전부 MA_002 old판 `SEC06_세부 현금흐름표_M+2계획`의 `sum:` 인스턴스였고, 그
+인스턴스는 선언과 manual-sort bucket에만 있었다 — 화면이 그리는 것은 `usr:` 쪽이다."""
+
+
+def _drawn_in(worksheet: Any, instance: str) -> bool:
+    """워크시트가 그 인스턴스를 **그리는 자리**(선반·필터·인코딩·서식 등)에서 참조하는가."""
+    if not instance:
+        return False
+    stack = list(worksheet)
+    while stack:
+        el = stack.pop()
+        if not isinstance(el.tag, str) or el.tag in _NOT_DRAWN:
+            continue
+        if (el.text and instance in el.text) or any(instance in v for v in el.attrib.values()):
+            return True
+        stack.extend(el)
+    return False
 
 
 def _known_fields(ctx: ValidationContext) -> set[str]:

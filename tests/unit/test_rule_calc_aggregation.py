@@ -194,17 +194,40 @@ def test_unresolvable_reference_is_reported_as_undecided_not_as_a_violation(
 
 
 def _wb_derived(
-    *calcs: Calc, target: str = "C_매출", derivation: str = "Sum", in_worksheet: bool = True
+    *calcs: Calc,
+    target: str = "C_매출",
+    derivation: str = "Sum",
+    in_worksheet: bool = True,
+    drawn: str = "rows",
 ) -> str:
-    """⑧-b용 — 계산 하나에 집계 파생 인스턴스를 건 워크북."""
+    """⑧-b용 — 계산 하나에 집계 파생 인스턴스를 건 워크북.
+
+    `drawn`: `"rows"`면 행 선반에 올린다, `"bucket"`이면 manual-sort 옛 bucket에만 남긴다.
+    """
+    inst_name = f"[{derivation.lower()}:{target}:qk]"
     instance = (
         f"<column-instance column='[{target}]' derivation='{derivation}' "
-        f"name='[{derivation.lower()}:{target}:qk]' pivot='key' type='quantitative' />"
+        f"name='{inst_name}' pivot='key' type='quantitative' />"
+    )
+    qualified = f"[federated.abc].{inst_name}"
+    where = (
+        f"<rows>{qualified}</rows>"
+        if drawn == "rows"
+        else (
+            "<manual-sort column='[federated.abc].[:Measure Names]' direction='ASC'>"
+            f"<dictionary><bucket>&quot;{qualified}&quot;</bucket></dictionary></manual-sort>"
+        )
+    )
+    view = (
+        f"<datasource-dependencies datasource='federated.abc'>{instance}"
+        f"</datasource-dependencies>"
     )
     body = (
-        f"<worksheets><worksheet name='S'><table><view>"
-        f"<datasource-dependencies datasource='federated.abc'>{instance}"
-        f"</datasource-dependencies></view></table></worksheet></worksheets>"
+        f"<worksheets><worksheet name='S'><table><view>{view}"
+        + (where if drawn == "bucket" else "")
+        + "</view>"
+        + (where if drawn == "rows" else "")
+        + "</table></worksheet></worksheets>"
         if in_worksheet
         else instance
     )
@@ -277,6 +300,22 @@ def test_datasource_only_instance_is_not_reported(
     ctx = ctx_for(
         tmp_path,
         _wb_derived(Calc(name="C_매출", formula="SUM([idct_val])"), in_worksheet=False),
+    )
+
+    assert rule.check(ctx) == []
+
+
+def test_instance_left_only_in_a_manual_sort_bucket_is_silent(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """선언과 manual-sort 옛 bucket에만 남은 인스턴스다 — 그리지 않으니 증상이 없다.
+
+    실측 2026-11-11: ⑧-b 잔여 20건이 전부 MA_002 old판의 이 모양이었다
+    (화면은 같은 계산의 `usr:` 인스턴스를 그린다).
+    """
+    ctx = ctx_for(
+        tmp_path,
+        _wb_derived(Calc(name="C_매출", formula="SUM([idct_val])"), drawn="bucket"),
     )
 
     assert rule.check(ctx) == []

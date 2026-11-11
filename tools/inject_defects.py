@@ -362,6 +362,10 @@ def _r27_double_aggregate(root: Any) -> str | None:
     """R27 — 워크시트가 쓰는 `usr:` 인스턴스의 파생을 `Sum`으로 바꾼다 → `SUM(SUM(…))`.
 
     수식은 건드리지 않는다 — 이 결함은 **수식과 파생의 불일치**이지 수식의 문제가 아니다.
+
+    선언만 바꾸면 선반은 여전히 옛 `usr:`를 가리켜 **그려지지 않는 `sum:`**이 된다 —
+    실제 결함(MA_011)은 선반에 `sum:`이 올라간 것이다. 그래서 그 워크시트 안의 참조도
+    전부 새 이름으로 바꾼다 (2026-11-11, ⑧-b가 그려지는 인스턴스만 보게 되면서).
     """
     for worksheet in root.iter():
         if not isinstance(worksheet.tag, str) or fcp.strip_prefix(worksheet.tag) != "worksheet":
@@ -373,9 +377,17 @@ def _r27_double_aggregate(root: Any) -> str | None:
                 continue
             column = (ci.get("column") or "").strip("[]")
             before = ci.get("name") or ""
+            after = f"[sum:{column}:qk]"
             ci.set("derivation", "Sum")
-            ci.set("name", f"[sum:{column}:qk]")
-            return f"{before}의 derivation User → Sum"
+            for el in worksheet.iter():
+                if not isinstance(el.tag, str):
+                    continue
+                for k, v in el.attrib.items():
+                    if before in v:
+                        el.set(k, v.replace(before, after))
+                if el.text and before in el.text:
+                    el.text = el.text.replace(before, after)
+            return f"{before}의 derivation User → Sum (워크시트 참조 포함)"
     return None
 
 def _r28_strip_corner_radius_prefix(root: Any) -> str | None:
