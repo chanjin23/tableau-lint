@@ -12,6 +12,13 @@
 있다는 것이 실측이다 — 삭제된 계산필드를 가리키는 `format@field` 규칙이 남아 있어도
 Tableau는 그 파일을 연다. ERROR로 두면 정상 골든셋 10/10이 게이트에서 막힌다.
 ERROR 승격은 라벨링 배치(TODO D1~D4) 이후다.
+
+**서식에만 남은 잔재는 INFO다** (2026-11-11). 미해소 참조가 전부 `format@field`에만 있으면
+그 필드를 그리는 자리가 없어 화면 증상이 없다. 실측: 코퍼스 1,544개의 이 규칙 경고 854건 중
+**689건(585개 파일)**이 이 모양이었고, 소유자가 최신 판본(MA_002 JWBS `SEC03_하위카드1~4`)을
+열어 정상 렌더링·`!` 없음을 확인했다. 같은 참조가 수식·필터·선반 등 다른 자리에도 있으면
+그대로 WARNING이다. 수식 쪽 165건(KPMG·디딤 템플릿의 `기간 필터` 계산)은 Tableau에서
+실제로 `!`가 떴다 — 이 규칙의 WARNING이 맞게 쓰이는 자리다.
 """
 
 from __future__ import annotations
@@ -40,6 +47,8 @@ class _Hit:
     line: int | None
     count: int = 1
     reason: str = "dangling"
+    drawn: bool = True
+    """서식(`format@field`) 밖에서도 참조되는가. `False`면 **서식에만 남은 잔재**다."""
 
 
 @register
@@ -73,13 +82,16 @@ class CalcFieldRefsRule(RuleBase):
 
         return [
             Finding(
-                severity=Severity.WARNING,
+                severity=Severity.WARNING if hit.drawn else Severity.INFO,
                 rule_id=self.id,
                 location=hit.location,
                 message=_message(hit),
                 fix=(
                     "필드가 삭제·개명됐다면 참조를 고치거나 남은 설정을 지운다. "
                     "정상 파일에도 잔재 참조가 남아 있는 경우가 있다 (03 D3.6.3)."
+                    if hit.drawn
+                    else "지워진 필드에 걸어 둔 서식이 남은 것이다 — 화면에는 영향이 없다. "
+                    "정리하려면 그 `format` 줄을 지운다."
                 ),
                 line=hit.line,
             )
@@ -122,14 +134,20 @@ class CalcFieldRefsRule(RuleBase):
         if reason == "dangling" and any(name in known for name in ref.names):
             return
 
+        drawn = el.tag != "format"  # 서식 자리는 그리는 자리가 아니다
         key = (ref.datasource or "", ref.names[0])
         hit = hits.get(key)
         if hit is None:
             hits[key] = _Hit(
-                raw=ref.raw, location=_path_of(el), line=el.sourceline, reason=reason
+                raw=ref.raw, location=_path_of(el), line=el.sourceline, reason=reason,
+                drawn=drawn,
             )
-        else:
-            hit.count += 1
+            return
+        hit.count += 1
+        if drawn and not hit.drawn:
+            # 서식 잔재로 먼저 잡혔어도 그리는 자리에서 쓰이면 WARNING — 그 자리를 가리킨다
+            hit.drawn = True
+            hit.location, hit.line = _path_of(el), el.sourceline
 
 
 def _universe(model: WorkbookModel) -> set[str]:
@@ -139,9 +157,10 @@ def _universe(model: WorkbookModel) -> set[str]:
 
 def _message(hit: _Hit) -> str:
     where = f" (참조 {hit.count}곳)" if hit.count > 1 else ""
+    residue = "" if hit.drawn else " — 서식에만 남은 잔재다 (화면 증상 없음)"
     if hit.reason == "unknown-datasource":
-        return f"`{hit.raw}`의 데이터소스가 워크북에 없다{where}"
-    return f"`{hit.raw}`가 가리키는 필드를 찾지 못했다{where}"
+        return f"`{hit.raw}`의 데이터소스가 워크북에 없다{where}{residue}"
+    return f"`{hit.raw}`가 가리키는 필드를 찾지 못했다{where}{residue}"
 
 
 def _path_of(el: Any) -> str:

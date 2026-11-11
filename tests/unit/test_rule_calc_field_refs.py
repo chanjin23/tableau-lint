@@ -107,6 +107,50 @@ def test_dangling_reference_is_a_warning_not_an_error(
     assert findings[0].line is not None
 
 
+def test_reference_left_only_in_format_is_info(tmp_path: Path, rule: CalcFieldRefsRule) -> None:
+    """지워진 필드에 걸어 둔 서식만 남았다 — 그리는 자리가 없어 화면 증상이 없다.
+
+    실측 2026-11-11: 코퍼스 경고 854건 중 689건이 이 모양이었고, 소유자가 최신 판본
+    (MA_002 JWBS `SEC03_하위카드1~4`)의 정상 렌더링을 확인했다.
+    """
+    xml = make_twb(
+        datasources=(DS,),
+        extra_body=(
+            '<worksheets><worksheet name="S"><table><style><style-rule element="cell">'
+            '<format attr="text-format" field="[federated.abc].[usr:Ghost:qk]" value="n#,##0" />'
+            '<format attr="color" field="[federated.abc].[usr:Ghost:qk]" value="#000000" />'
+            "</style-rule></style></table></worksheet></worksheets>"
+        ),
+    )
+
+    findings = rule.check(ctx_for(tmp_path, xml))
+
+    assert [f.severity for f in findings] == [Severity.INFO]
+    assert "서식에만 남은 잔재" in findings[0].message
+
+
+def test_format_residue_also_used_elsewhere_stays_a_warning(
+    tmp_path: Path, rule: CalcFieldRefsRule
+) -> None:
+    """같은 참조가 필터에도 있으면 잔재가 아니다 — WARNING이고 필터 자리를 가리킨다."""
+    xml = make_twb(
+        datasources=(DS,),
+        extra_body=(
+            '<worksheets><worksheet name="S"><table><style><style-rule element="cell">'
+            '<format attr="text-format" field="[federated.abc].[usr:Ghost:qk]" value="n#,##0" />'
+            "</style-rule></style>"
+            '<filter column="[federated.abc].[usr:Ghost:qk]" />'
+            "</table></worksheet></worksheets>"
+        ),
+    )
+
+    findings = rule.check(ctx_for(tmp_path, xml))
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+    assert "서식에만" not in findings[0].message
+    assert findings[0].location.endswith("filter")
+
+
 def test_special_namespaces_are_never_flagged(tmp_path: Path, rule: CalcFieldRefsRule) -> None:
     """과거 lint가 `[:Measure Names]`에서 오탐했다 (함정 S9, 실측 544회)."""
     xml = make_twb(
