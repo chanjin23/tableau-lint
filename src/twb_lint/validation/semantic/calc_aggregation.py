@@ -193,11 +193,12 @@ class CalcAggregationRule(RuleBase):
             return []
 
         known = _known_fields(ctx)
+        by_ds = _formulas_by_datasource(ctx.raw_tree)
         undecided: list[str] = []
-        out = self._missing_aggregate(ctx, formulas, known, undecided)
-        out += self._double_aggregate(ctx, formulas, known, undecided)
-        out += self._mixed_levels(ctx, formulas, known, undecided)
-        out += self._attr_in_sort(ctx, formulas, known, undecided)
+        out = self._missing_aggregate(ctx, formulas, by_ds, known, undecided)
+        out += self._double_aggregate(ctx, formulas, by_ds, known, undecided)
+        out += self._mixed_levels(ctx, formulas, by_ds, known, undecided)
+        out += self._attr_in_sort(ctx, formulas, by_ds, known, undecided)
 
         if undecided:
             # 판정 못 한 것을 조용히 넘기면 "전부 검사했다"로 읽힌다 (02 S5).
@@ -213,16 +214,18 @@ class CalcAggregationRule(RuleBase):
         self,
         ctx: ValidationContext,
         formulas: dict[str, str],
+        by_ds: dict[str, dict[str, str]],
         known: set[str],
         undecided: list[str],
     ) -> list[Finding]:
         """⑧-a — `usr:`로 올렸는데 수식에 집계가 없다."""
         out: list[Finding] = []
         for el, name in _user_aggregations(ctx.raw_tree):
-            formula = formulas.get(name)
+            scope = _scope(by_ds, _datasource_of(el), formulas)
+            formula = scope.get(name)
             if formula is None:
                 continue  # 이 워크북에 정의가 없는 계산 — 규칙 ②의 소관이다
-            verdict = _chain_has_aggregate(name, formulas, known)
+            verdict = _chain_has_aggregate(name, scope, known)
             if verdict is None:
                 undecided.append(name)
                 continue
@@ -250,15 +253,17 @@ class CalcAggregationRule(RuleBase):
         self,
         ctx: ValidationContext,
         formulas: dict[str, str],
+        by_ds: dict[str, dict[str, str]],
         known: set[str],
         undecided: list[str],
     ) -> list[Finding]:
         """⑧-b — 집계식에 집계 파생(`sum:` 등)을 다시 걸었다."""
         out: list[Finding] = []
         for el, name, derivation in _view_aggregate_instances(ctx.raw_tree):
-            if name not in formulas:
+            scope = _scope(by_ds, _datasource_of(el), formulas)
+            if name not in scope:
                 continue  # 계산이 아닌 원본 컬럼 — `SUM([매출액])`은 정상이다
-            verdict = _chain_has_aggregate(name, formulas, known)
+            verdict = _chain_has_aggregate(name, scope, known)
             if verdict is None:
                 undecided.append(name)
                 continue
@@ -289,6 +294,7 @@ class CalcAggregationRule(RuleBase):
         self,
         ctx: ValidationContext,
         formulas: dict[str, str],
+        by_ds: dict[str, dict[str, str]],
         known: set[str],
         undecided: list[str],
     ) -> list[Finding]:
@@ -301,8 +307,9 @@ class CalcAggregationRule(RuleBase):
             )
             if not split.aggregates:
                 continue
+            scope = _scope(by_ds, _datasource_of(el), formulas)
             row_level = _confident_row_level(
-                split.bare_refs, formulas, known, params, undecided
+                split.bare_refs, scope, known, params, undecided
             )
             if not row_level:
                 continue
@@ -332,6 +339,7 @@ class CalcAggregationRule(RuleBase):
         self,
         ctx: ValidationContext,
         formulas: dict[str, str],
+        by_ds: dict[str, dict[str, str]],
         known: set[str],
         undecided: list[str],
     ) -> list[Finding]:
@@ -345,10 +353,11 @@ class CalcAggregationRule(RuleBase):
             using = fieldref.parse(el.get("using") or "")
             if using is None or using.special is not None:
                 continue
-            name = next((n for n in using.names if n in formulas), None)
+            scope = _scope(by_ds, using.datasource, formulas)
+            name = next((n for n in using.names if n in scope), None)
             if name is None:
                 continue  # 원본 컬럼 정렬 — 계산이 아니다
-            verdict = _chain_has_attr(name, formulas, known)
+            verdict = _chain_has_attr(name, scope, known)
             if verdict is None:
                 undecided.append(name)
                 continue
@@ -431,6 +440,56 @@ def _captions(root: Any) -> dict[str, str]:
     return out
 
 
+def _formulas_by_datasource(root: Any) -> dict[str, dict[str, str]]:
+    """데이터소스 이름 → (계산 이름 → 수식).
+
+    **계산 내부 이름은 데이터소스마다 겹칠 수 있다.** 실측(2026-11-11) MA_001 경영요약:
+    데이터소스 15개가 `Calculation_9100000000000012`를 서로 다른 계산으로 쓴다
+    (결제수금은 `C_계정구분` 행수준, 구매자금 등은 `C_당월실적 = SUM(…)`). 이름만으로
+    찾으면 첫 데이터소스 수식을 읽어 ⑧-a가 정상 시트 64건을 위반으로 셌다.
+
+    정의부(`datasource/column`)가 먼저, 없으면 워크시트 `datasource-dependencies` 사본.
+    """
+    out: dict[str, dict[str, str]] = {}
+
+    def add(ds_name: str | None, col: Any) -> None:
+        name = (col.get("name") or "").strip("[]")
+        calc = col.find("calculation")
+        if ds_name and name and calc is not None and calc.get("formula"):
+            out.setdefault(ds_name, {}).setdefault(name, calc.get("formula") or "")
+
+    for ds in root.iter("datasource"):
+        for col in ds.findall("column"):
+            add(ds.get("name"), col)
+    for deps in root.iter("datasource-dependencies"):
+        for col in deps.findall("column"):
+            add(deps.get("datasource"), col)
+    return out
+
+
+def _datasource_of(el: Any) -> str | None:
+    """요소가 속한 데이터소스 이름 — 정의부(`datasource@name`)나 워크시트 사본
+    (`datasource-dependencies@datasource`). 어느 쪽도 아니면 None."""
+    for anc in el.iterancestors():
+        if anc.tag == "datasource-dependencies":
+            return str(anc.get("datasource")) if anc.get("datasource") else None
+        if anc.tag == "datasource":
+            return str(anc.get("name")) if anc.get("name") else None
+    return None
+
+
+def _scope(
+    by_ds: dict[str, dict[str, str]], ds: str | None, fallback: dict[str, str]
+) -> dict[str, str]:
+    """그 데이터소스의 수식표. 데이터소스를 모르면 워크북 전체(첫 정의) — 예전 동작.
+
+    수식 안 참조는 자격이 없으면 **같은 데이터소스**를 가리키므로 체인도 이 범위에서 편다.
+    """
+    if ds is not None and ds in by_ds:
+        return by_ds[ds]
+    return fallback
+
+
 def _formulas_by_name(root: Any) -> dict[str, str]:
     """계산필드 이름 → 수식. 워크시트 안 복제본도 같은 이름을 쓴다."""
     out: dict[str, str] = {}
@@ -449,17 +508,18 @@ def _user_aggregations(root: Any) -> list[tuple[Any, str]]:
     어느 시트도 그리지 않으니 증상이 없다. 실측(2026-11-10): MA_011 JWP의
     `C_실적누적값(복사본)`(`"당월"`/`"이전월"`)이 데이터소스에 `usr:` 잔재를 남겼고 유일한
     사용 시트는 `none:`으로 쓴다 — 소유자가 그 시트의 정상 렌더링을 확인했다.
-    이름당 첫 자리만 보고한다.
+    (데이터소스, 이름)당 첫 자리만 보고한다 — 같은 이름이 데이터소스마다 다른 계산일 수 있다.
     """
-    seen: set[str] = set()
+    seen: set[tuple[str | None, str]] = set()
     out: list[tuple[Any, str]] = []
     for worksheet in root.iter("worksheet"):
         for ci in worksheet.iter("column-instance"):
             if ci.get("derivation") != "User":
                 continue
             name = (ci.get("column") or "").strip("[]")
-            if name and name not in seen:
-                seen.add(name)
+            key = (_datasource_of(ci), name)
+            if name and key not in seen:
+                seen.add(key)
                 out.append((ci, name))
     return out
 
@@ -470,7 +530,7 @@ def _view_aggregate_instances(root: Any) -> list[tuple[Any, str, str]]:
     데이터소스에만 있는 인스턴스는 빼는 것이 이 함수의 요점이다 — 실측 위반 65건 중
     63건이 그 잔재였다 (⑧-b 독스트링). 이름당 첫 자리만 보고한다.
     """
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str | None, str, str]] = set()
     out: list[tuple[Any, str, str]] = []
     for worksheet in root.iter("worksheet"):
         for ci in worksheet.iter("column-instance"):
@@ -478,9 +538,10 @@ def _view_aggregate_instances(root: Any) -> list[tuple[Any, str, str]]:
             if derivation not in AGGREGATE_DERIVATIONS:
                 continue
             name = (ci.get("column") or "").strip("[]")
-            if not name or (name, derivation) in seen:
+            key = (_datasource_of(ci), name, derivation)
+            if not name or key in seen:
                 continue
-            seen.add((name, derivation))
+            seen.add(key)
             out.append((ci, name, derivation))
     return out
 

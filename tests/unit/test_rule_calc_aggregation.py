@@ -112,6 +112,56 @@ def test_user_instance_left_only_in_the_datasource_is_silent(
     assert rule.check(ctx) == []
 
 
+def _wb_two_sources(used_ds: str) -> str:
+    """두 데이터소스가 **같은 내부 이름**을 서로 다른 계산으로 쓴다 (MA_001 경영요약 모양).
+
+    `federated.a`는 행수준, `federated.b`는 집계. 워크시트는 `used_ds` 쪽을 `usr:`로 올린다.
+    """
+    ci = (
+        "<column-instance column='[Calculation_1]' derivation='User' "
+        "name='[usr:Calculation_1:qk]' pivot='key' type='quantitative' />"
+    )
+    return make_twb(
+        datasources=(
+            Ds(name="federated.a", columns=("코드",), calcs=(
+                Calc(name="Calculation_1", formula='IF [코드] = "x" THEN "현금" ELSE "전체" END'),
+            )),
+            Ds(name="federated.b", columns=("값",), calcs=(
+                Calc(name="Calculation_1", formula="SUM([값])"),
+            )),
+        ),
+        extra_body=(
+            f"<worksheets><worksheet name='S'><table><view>"
+            f"<datasource-dependencies datasource='{used_ds}'>{ci}"
+            f"</datasource-dependencies></view></table></worksheet></worksheets>"
+        ),
+    )
+
+
+def test_same_calc_name_in_another_datasource_is_not_confused(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """시트가 쓰는 데이터소스의 수식으로 판정한다 — 첫 데이터소스 수식이 아니라.
+
+    실측 2026-11-11 MA_001 경영요약: 데이터소스 15개가 내부 이름을 겹쳐 썼고, 이름만으로
+    찾던 시절 ⑧-a가 `SUM(…)`인 정상 시트 64건을 위반으로 셌다.
+    """
+    ctx = ctx_for(tmp_path, _wb_two_sources("federated.b"))
+
+    assert rule.check(ctx) == []
+
+
+def test_row_level_calc_in_the_used_datasource_is_still_a_warning(
+    rule: CalcAggregationRule, tmp_path: Path
+) -> None:
+    """반대쪽 — 시트가 행수준 쪽을 `usr:`로 올렸으면 여전히 잡는다 (좁히기만 한 게 아니다)."""
+    ctx = ctx_for(tmp_path, _wb_two_sources("federated.a"))
+
+    findings = rule.check(ctx)
+
+    assert [f.severity for f in findings] == [Severity.WARNING]
+
+
 def test_dimension_instances_are_not_judged(rule: CalcAggregationRule, tmp_path: Path) -> None:
     """`derivation="None"`은 차원으로 올린 것이다 — 집계를 요구하지 않는다."""
     xml = make_twb(
