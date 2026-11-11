@@ -1,8 +1,11 @@
-"""레시피 건의함 — 없거나 틀린 레시피를 모아 두었다가 빈도순으로 본다.
+"""건의함 (MCP `twb_suggestion_box` · CLI `suggestion-box`) — 레시피·검사기 문제를 모아
+두었다가 빈도순으로 본다.
 
-`twb_recipe`가 `found: False`를 돌려주거나, 레시피대로 썼는데 `twb_validate`가 실패하면
-호출자가 여기에 한 줄 접수한다. **접수는 레시피가 아니다** — 레시피는 Tableau에서 관찰한
-실측 정답지이고(`docs/recipes/`), 여기 쌓인 것은 "무엇이 부족한가"의 목록일 뿐이다.
+`twb_recipe`가 `found: False`를 돌려주거나, 레시피대로 썼는데 `twb_validate`가 실패하거나,
+검사 결과와 Tableau가 어긋나면(통과했는데 깨짐 · 경고했는데 정상) 호출자가 여기에 한 줄
+접수한다. 종류마다 필수 항목이 다르다 (`KINDS`). **접수는 레시피도 규칙도 아니다** —
+레시피는 Tableau에서 관찰한 실측 정답지이고(`docs/recipes/`), 규칙은 코퍼스 대조와 분리
+실험을 거친다. 여기 쌓인 것은 "무엇이 부족한가"의 목록일 뿐이다.
 
 저장은 추가 전용 JSONL이다 (`.twb-lint/recipe-requests.jsonl`, gitignore). 접수·해결을
 이벤트로 한 줄씩 덧붙이고, 읽을 때 합친다 — 중복을 합치려고 파일을 고쳐 쓰지 않으므로
@@ -24,8 +27,22 @@ from typing import Literal
 
 from twb_lint import recipes
 
-Kind = Literal["missing", "defective"]
-KINDS: tuple[Kind, ...] = ("missing", "defective")
+Kind = Literal["missing", "defective", "lint_missed", "lint_false_alarm"]
+KINDS: tuple[Kind, ...] = ("missing", "defective", "lint_missed", "lint_false_alarm")
+"""건의 종류.
+
+- `missing` — 레시피가 없다 (`twb_recipe` found=False)
+- `defective` — 레시피대로 썼는데 `twb_validate`가 실패했다 (`recipe` 필수)
+- `lint_missed` — 검사는 통과했는데 Tableau에서 깨졌다 (`symptom`·`layer` 필수)
+- `lint_false_alarm` — 검사가 경고·오류를 냈는데 Tableau에서는 정상이다 (`rule_ids` 필수)
+"""
+
+Layer = Literal["load_refused", "setting_dropped", "no_data", "field_error"]
+LAYERS: tuple[Layer, ...] = ("load_refused", "setting_dropped", "no_data", "field_error")
+"""실패 4층 (01 v2.0) — 1 파일이 안 열린다 · 2 설정이 버려졌다 · 3 데이터가 안 나온다 ·
+4 필드가 오류 상태다(빨간 알약·느낌표). `lint_missed`만 쓴다."""
+
+LINT_KINDS = frozenset({"lint_missed", "lint_false_alarm"})
 
 _STORE_ENV = "TWB_LINT_REQUESTS"
 _STORE_DEFAULT = Path(__file__).resolve().parents[2] / ".twb-lint" / "recipe-requests.jsonl"
@@ -57,6 +74,10 @@ class Request:
     rule_ids: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     resolved_by: str | None = None  # None = 열림. 닫히면 레시피 이름 (없으면 "")
+    symptom: str = ""
+    """Tableau에서 본 것 — 오류 문구 그대로 또는 "정상"."""
+    layer: str | None = None
+    """`lint_missed`의 실패 층 (`LAYERS`)."""
 
 
 def store_path() -> Path:
@@ -73,8 +94,11 @@ def _normalize(text: str) -> str:
     return re.sub(r"[\W_]+", " ", text.lower()).strip()
 
 
-def _make_id(kind: str, recipe: str, task: str) -> str:
+def _make_id(kind: str, recipe: str, task: str, rule_ids: list[str] | None = None) -> str:
     key = f"{kind}|{recipe}|{_normalize(task)}"
+    if kind in LINT_KINDS and rule_ids:
+        # 같은 증상이라도 다른 규칙의 문제면 다른 건이다
+        key += "|" + ",".join(sorted(rule_ids))
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:8]
 
 
@@ -102,13 +126,25 @@ def submit(
     recipe: str = "",
     rule_ids: list[str] | None = None,
     note: str = "",
+    symptom: str = "",
+    layer: str | None = None,
 ) -> Request:
     """접수 1건을 덧붙이고, 합쳐진 현재 상태를 돌려준다.
 
-    `defective`는 따른 레시피를 알아야 한다 — 존재하지 않는 레시피는 거절한다.
+    종류별 필수 항목 (`KINDS` 참조):
+    `defective`는 따른 레시피 — 존재하지 않는 레시피는 거절한다.
+    `lint_missed`는 `symptom`과 `layer`, `lint_false_alarm`은 울린 규칙(`rule_ids`).
     """
     if kind not in KINDS:
         raise RequestError(f"kind는 {' | '.join(KINDS)} 중 하나여야 한다: {kind!r}")
+    if layer is not None and layer not in LAYERS:
+        raise RequestError(f"layer는 {' | '.join(LAYERS)} 중 하나여야 한다: {layer!r}")
+    if kind == "lint_missed" and layer is None:
+        raise RequestError("lint_missed는 layer(어느 층에서 깨졌나)가 필요하다.")
+    if kind != "lint_missed" and layer is not None:
+        raise RequestError("layer는 lint_missed에만 쓴다.")
+    if kind == "lint_false_alarm" and not rule_ids:
+        raise RequestError("lint_false_alarm은 울린 규칙(rule_ids)이 필요하다.")
     if not recipes.recipes_dir().is_dir():
         # wheel 설치 — 체크아웃이 아니라서 쓸 곳이 없다 (recipes.py와 같은 전제)
         raise RequestError(
@@ -116,6 +152,9 @@ def submit(
         )
     task_text = _clean_text("task", task, _MAX_TASK, required=True)
     note_text = _clean_text("note", note, _MAX_NOTE, required=False)
+    symptom_text = _clean_text(
+        "symptom", symptom, _MAX_NOTE, required=(kind == "lint_missed")
+    )
 
     recipe_name = ""
     if kind == "defective":
@@ -131,19 +170,22 @@ def submit(
         if not _RULE_ID.match(rule_id):
             raise RequestError(f"rule_id 형식이 아니다: {rule_id!r}")
 
-    req_id = _make_id(kind, recipe_name, task_text)
-    _append(
-        {
-            "event": "submit",
-            "id": req_id,
-            "at": _now(),
-            "kind": kind,
-            "task": task_text,
-            "recipe": recipe_name,
-            "rule_ids": ids,
-            "note": note_text,
-        }
-    )
+    req_id = _make_id(kind, recipe_name, task_text, ids)
+    event: dict[str, object] = {
+        "event": "submit",
+        "id": req_id,
+        "at": _now(),
+        "kind": kind,
+        "task": task_text,
+        "recipe": recipe_name,
+        "rule_ids": ids,
+        "note": note_text,
+    }
+    if symptom_text:
+        event["symptom"] = symptom_text
+    if layer is not None:
+        event["layer"] = layer
+    _append(event)
     return next(r for r in load() if r.id == req_id)
 
 
@@ -189,6 +231,10 @@ def load() -> list[Request]:
             )
             req.count += 1
             req.last_seen = event.get("at", "")
+            if event.get("symptom"):
+                req.symptom = event["symptom"]  # 최근 접수의 증상을 보인다
+            if event.get("layer"):
+                req.layer = event["layer"]
             for rule_id in event.get("rule_ids", []):
                 if rule_id not in req.rule_ids:
                     req.rule_ids.append(rule_id)

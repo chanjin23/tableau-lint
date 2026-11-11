@@ -83,14 +83,28 @@ venv 안의 실행 파일을 바로 등록하세요. `uv run`으로 등록하면
 | `twb_inspect` | 파일 구조만 훑어볼 때 (필드, 시트 목록 등) |
 | `twb_recipe` | XML을 쓰기 **전에** 정답 예시를 찾아볼 때 |
 | `twb_validate` | 다 만든 뒤 검사할 때 — 통과 못 하면 내보내지 않아요 |
-| `twb_recipe_request` | 찾는 레시피가 없거나, 레시피대로 했는데도 실패했을 때 "이거 필요해요" 하고 남겨 두는 건의함 |
+| `twb_suggestion_box` | 건의함. 레시피나 검사기에 문제가 있을 때 남겨 둔다 (아래 네 종류) |
+
+### 건의함에 남기는 네 가지
+
+| 종류 (`kind`) | 이럴 때 | 꼭 넣을 것 |
+|---|---|---|
+| `missing` | 찾는 레시피가 없다 | `task` (하려던 작업) |
+| `defective` | 레시피대로 했는데 검사에서 실패했다 | `recipe` (따른 레시피 번호) |
+| `lint_missed` | 검사는 통과했는데 Tableau에서 깨졌다 | `symptom` (Tableau 오류 문구 그대로) · `layer` (어디서 깨졌나) |
+| `lint_false_alarm` | 검사가 경고했는데 Tableau에서는 멀쩡하다 | `rule_ids` (울린 규칙) |
+
+`layer`는 실패 4층 중 하나입니다 — `load_refused`(안 열림) · `setting_dropped`(설정이 사라짐) ·
+`no_data`(데이터가 안 나옴) · `field_error`(빨간 알약·느낌표). 빠진 게 있으면 접수를 거절하고
+무엇이 빠졌는지 알려 줍니다.
 
 ### 건의함 확인하기
 
 ```bash
-twb-lint recipe-requests                              # 아직 처리 안 된 건의 (많이 요청된 순)
-twb-lint recipe-requests --all                        # 처리된 것까지 전부
-twb-lint recipe-requests --resolve <ID> --recipe 14   # 처리 완료 표시
+twb-lint suggestion-box                               # 아직 처리 안 된 건의 (많이 요청된 순)
+twb-lint suggestion-box --all                         # 처리된 것까지 전부
+twb-lint suggestion-box --kind lint_false_alarm       # 한 종류만
+twb-lint suggestion-box --resolve <ID> --recipe 14    # 처리 완료 표시
 ```
 
 건의함은 내 PC에만 저장됩니다(`.twb-lint/recipe-requests.jsonl`, git에 올라가지 않아요).
@@ -125,13 +139,13 @@ Claude Code용 명령 세 가지로 작업합니다.
 커밋하기 전에 아래 두 가지는 꼭 통과해야 합니다.
 
 ```bash
-.venv/Scripts/python -m pytest -q       # 453 passed, 14 skipped
+.venv/Scripts/python -m pytest -q       # 460 passed, 14 skipped
 .venv/Scripts/python -m ruff check .    # All checks passed
 ```
 
 > ⚠️ 테스트에 쓰는 실제 워크북(골든셋)은 **저장소에 없습니다.** 회사 재무 데이터라서요.
 > 실파일 테스트까지 돌리려면 `TWB_LINT_GOLDEN_NORMAL` 환경변수에 경로를 걸어 주세요
-> (그러면 467 passed가 나옵니다).
+> (그러면 474 passed가 나옵니다).
 
 ---
 

@@ -133,8 +133,8 @@ def test_empty_store_loads_as_empty() -> None:
 
 
 def test_tool_accepts_and_reports_the_merged_count() -> None:
-    first = server.twb_recipe_request("missing", "밴드 차트")
-    second = server.twb_recipe_request("missing", "밴드 차트")
+    first = server.twb_suggestion_box("missing", "밴드 차트")
+    second = server.twb_suggestion_box("missing", "밴드 차트")
 
     assert first["accepted"] is True
     assert second["id"] == first["id"]
@@ -142,7 +142,7 @@ def test_tool_accepts_and_reports_the_merged_count() -> None:
 
 
 def test_tool_returns_a_refusal_instead_of_raising() -> None:
-    result = server.twb_recipe_request("defective", "색 팔레트")
+    result = server.twb_suggestion_box("defective", "색 팔레트")
 
     assert result["accepted"] is False
     assert "레시피" in result["message"]
@@ -151,12 +151,12 @@ def test_tool_returns_a_refusal_instead_of_raising() -> None:
 def test_recipe_miss_points_to_the_request_tool() -> None:
     result = server.twb_recipe("qqqqzzzz")
 
-    assert "twb_recipe_request" in result["message"]
+    assert "twb_suggestion_box" in result["message"]
 
 
 def test_request_tool_is_not_marked_read_only() -> None:
     """읽기 전용 도구들과 달리 파일에 쓴다 — 호스트가 권한을 다르게 물을 수 있어야 한다."""
-    tool = next(t for t in server.mcp._tool_manager.list_tools() if t.name == "twb_recipe_request")
+    tool = next(t for t in server.mcp._tool_manager.list_tools() if t.name == "twb_suggestion_box")
 
     assert tool.annotations is not None
     assert tool.annotations.readOnlyHint is False
@@ -168,7 +168,7 @@ def test_request_tool_rejects_an_unknown_argument() -> None:
     with pytest.raises(ToolError, match="Extra inputs are not permitted"):
         asyncio.run(
             server.mcp.call_tool(
-                "twb_recipe_request", {"kind": "missing", "task": "x", "name": "y"}
+                "twb_suggestion_box", {"kind": "missing", "task": "x", "name": "y"}
             )
         )
 
@@ -181,7 +181,7 @@ def test_cli_lists_open_requests_by_frequency(capsys: pytest.CaptureFixture[str]
     recipe_requests.submit("missing", "자주 오는 것")
     recipe_requests.submit("missing", "자주 오는 것", note="메모 하나")
 
-    assert cli.main(["recipe-requests"]) == 0
+    assert cli.main(["suggestion-box"]) == 0
 
     out = capsys.readouterr().out.splitlines()
     assert "x2" in out[0] and "자주 오는 것" in out[0]
@@ -192,14 +192,92 @@ def test_cli_lists_open_requests_by_frequency(capsys: pytest.CaptureFixture[str]
 def test_cli_resolve_closes_a_request_and_hides_it(capsys: pytest.CaptureFixture[str]) -> None:
     req = recipe_requests.submit("missing", "닫을 것")
 
-    assert cli.main(["recipe-requests", "--resolve", req.id, "--recipe", "01"]) == 0
+    assert cli.main(["suggestion-box", "--resolve", req.id, "--recipe", "01"]) == 0
     capsys.readouterr()
-    assert cli.main(["recipe-requests"]) == 0
+    assert cli.main(["suggestion-box"]) == 0
     assert "열린 건의가 없다" in capsys.readouterr().out
-    assert cli.main(["recipe-requests", "--all"]) == 0
+    assert cli.main(["suggestion-box", "--all"]) == 0
     assert "닫힘" in capsys.readouterr().out
 
 
 def test_cli_resolve_unknown_id_fails(capsys: pytest.CaptureFixture[str]) -> None:
-    assert cli.main(["recipe-requests", "--resolve", "deadbeef"]) == 1
+    assert cli.main(["suggestion-box", "--resolve", "deadbeef"]) == 1
     assert "deadbeef" in capsys.readouterr().err
+
+
+# --- 검사기 건의 (lint_missed · lint_false_alarm) ------------------------
+
+
+def test_lint_missed_needs_symptom_and_layer() -> None:
+    """검사는 통과했는데 Tableau에서 깨졌다 — 무엇을 봤고 어느 층인지가 없으면 재현을 못 한다."""
+    with pytest.raises(recipe_requests.RequestError, match="layer"):
+        recipe_requests.submit("lint_missed", "정렬 계산", symptom="정렬이 잘못되었습니다")
+    with pytest.raises(recipe_requests.RequestError, match="symptom"):
+        recipe_requests.submit("lint_missed", "정렬 계산", layer="field_error")
+
+    req = recipe_requests.submit(
+        "lint_missed", "정렬 계산", symptom="'X'에 대한 정렬이 잘못되었습니다",
+        layer="field_error", rule_ids=["calc.aggregation"],
+    )
+
+    assert (req.kind, req.layer, req.symptom) == (
+        "lint_missed", "field_error", "'X'에 대한 정렬이 잘못되었습니다"
+    )
+
+
+def test_lint_false_alarm_needs_the_rule_that_fired() -> None:
+    with pytest.raises(recipe_requests.RequestError, match="rule_ids"):
+        recipe_requests.submit("lint_false_alarm", "서식 잔재 경고", symptom="정상 렌더링")
+
+    req = recipe_requests.submit(
+        "lint_false_alarm", "서식 잔재 경고", rule_ids=["calc.field_refs"], symptom="정상 렌더링"
+    )
+
+    assert req.rule_ids == ["calc.field_refs"]
+
+
+def test_layer_is_only_for_lint_missed_and_must_be_known() -> None:
+    with pytest.raises(recipe_requests.RequestError, match="lint_missed에만"):
+        recipe_requests.submit("missing", "x", layer="no_data")
+    with pytest.raises(recipe_requests.RequestError, match="layer는"):
+        recipe_requests.submit("lint_missed", "x", symptom="y", layer="broken")
+
+
+def test_same_false_alarm_symptom_on_different_rules_is_not_merged() -> None:
+    a = recipe_requests.submit("lint_false_alarm", "정상인데 경고", rule_ids=["calc.aggregation"])
+    b = recipe_requests.submit("lint_false_alarm", "정상인데 경고", rule_ids=["calc.field_refs"])
+
+    assert a.id != b.id
+
+
+def test_tool_schema_lists_kinds_and_layers() -> None:
+    """호출자가 종류·층을 추측하지 않도록 스키마가 허용값을 내보인다."""
+    tool = next(t for t in server.mcp._tool_manager.list_tools() if t.name == "twb_suggestion_box")
+    props = tool.parameters["properties"]
+
+    assert props["kind"]["enum"] == list(recipe_requests.KINDS)
+    layer_enum = next(o["enum"] for o in props["layer"]["anyOf"] if "enum" in o)
+    assert layer_enum == list(recipe_requests.LAYERS)
+    assert "lint_missed" in props["kind"]["description"]
+
+
+def test_tool_accepts_a_lint_report() -> None:
+    result = server.twb_suggestion_box(
+        "lint_missed", "정렬 계산", symptom="정렬이 잘못되었습니다", layer="field_error"
+    )
+
+    assert result["accepted"] is True
+
+
+def test_cli_shows_symptom_and_filters_by_kind(capsys: pytest.CaptureFixture[str]) -> None:
+    recipe_requests.submit("missing", "밴드 차트")
+    recipe_requests.submit(
+        "lint_missed", "정렬 계산", symptom="정렬이 잘못되었습니다", layer="field_error"
+    )
+
+    assert cli.main(["suggestion-box", "--kind", "lint_missed"]) == 0
+
+    out = capsys.readouterr().out
+    assert "lint_missed (field_error)" in out
+    assert "▶ 정렬이 잘못되었습니다" in out
+    assert "밴드 차트" not in out
